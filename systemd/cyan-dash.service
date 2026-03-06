@@ -1,0 +1,14 @@
+[Unit]
+Description=Cyan Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/projects/cyan-dash/server
+EnvironmentFile=%h/workspace/projects/cyan-dash/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

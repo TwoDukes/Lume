@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Cyan</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="header">
+  <h1>CYAN</h1>
+  <div class="header-right">
+    <span class="badge connecting" id="status">CONNECTING</span>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- FEED (left, full height) -->
+  <div class="panel panel-feed">
+    <div class="panel-header" onclick="togglePanel('feed')">
+      <span class="panel-toggle" id="feed-toggle">&#9660;</span>
+      Feed
+      <span class="count" id="feed-count">0</span>
+    </div>
+    <div class="panel-body" id="feed-cards">
+      <div class="empty-state">
+        <div class="empty-state-icon">&#9673;</div>
+        Waiting for updates
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="right-col">
+
+    <!-- ACTIONS (top-right) -->
+    <div class="panel panel-actions">
+      <div class="panel-header" onclick="togglePanel('actions')">
+        <span class="panel-toggle" id="actions-toggle">&#9660;</span>
+        Actions
+      </div>
+      <div class="panel-body">
+        <div class="action-grid" id="action-grid">
+          <div class="empty-state">
+            <div class="empty-state-icon">&#9881;</div>
+            No actions
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANVAS / LAB (bottom-right, larger) -->
+    <div class="panel panel-canvas">
+      <div class="panel-header">Canvas</div>
+      <div class="panel-body">
+        <div class="canvas-content" id="canvas-content">
+          <div class="empty-state">
+            <div class="empty-state-icon">&#9634;</div>
+            Nothing here yet
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="/config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
