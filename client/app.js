@@ -437,7 +437,9 @@ function blockHTML(block) {
 
     case 'mermaid':
       const mermaidId = 'mermaid-' + (mermaidCounter++);
-      return `<div class="canvas-block canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}"></div>`;
+      return `<div class="canvas-block canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}">
+        <button class="chart-expand-btn" onclick="expandMermaid('${mermaidId}')" title="Fullscreen">⛶</button>
+      </div>`;
 
     case 'collapsible':
       const innerBlocks = (block.blocks || []).map(blockHTML).join('');
@@ -587,6 +589,22 @@ function expandChart(chartId) {
 
 window.copyCode = copyCode;
 window.expandChart = expandChart;
+
+function expandMermaid(id) {
+  const orig = document.getElementById(id);
+  if (!orig) return;
+  const svg = orig.querySelector('svg');
+  if (!svg) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay';
+  overlay.innerHTML = `<div class="chart-overlay-inner mermaid-overlay-inner">
+    <button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button>
+    ${svg.outerHTML}
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+window.expandMermaid = expandMermaid;
 
 // --- Markdown ---
 if (typeof marked !== 'undefined') {

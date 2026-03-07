@@ -817,3 +817,7 @@ body {
 /* Allow pinch-zoom on charts only */
 body { touch-action: pan-y; }
 .canvas-chart-block { touch-action: pinch-zoom; }
+
+/* Mermaid expand */
+.canvas-mermaid-block { position: relative; touch-action: pinch-zoom; }
+.mermaid-overlay-inner svg { width: 100%; height: auto; max-height: 80vh; }
