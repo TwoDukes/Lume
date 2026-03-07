@@ -598,9 +598,10 @@ function expandMermaid(id) {
   if (!svg) return;
 
   const cloned = svg.cloneNode(true);
-  // Fit the whole diagram to the modal width — pinch-zoom from there
   cloned.style.width = '100%';
   cloned.style.height = 'auto';
+  cloned.style.transformOrigin = 'center center';
+  cloned.style.transition = 'transform 0.05s';
   cloned.removeAttribute('width');
   cloned.removeAttribute('height');
 
@@ -621,6 +622,30 @@ function expandMermaid(id) {
   document.body.appendChild(overlay);
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  // JS pinch-zoom via transform: scale()
+  let scale = 1, lastDist = 0;
+  inner.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      lastDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      e.preventDefault();
+    }
+  }, { passive: false });
+  inner.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      scale = Math.min(Math.max(scale * (dist / lastDist), 0.5), 6);
+      lastDist = dist;
+      cloned.style.transform = `scale(${scale})`;
+      e.preventDefault();
+    }
+  }, { passive: false });
 }
 window.expandMermaid = expandMermaid;
 
