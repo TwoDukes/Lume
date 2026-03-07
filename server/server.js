@@ -4,6 +4,8 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { join, extname, dirname } from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
+import cookie from "cookie";
+import crypto from "crypto";
 
 // ─── Config (from environment) ────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || "7777");
@@ -15,6 +17,54 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 if (!TOKEN) {
   console.error("ERROR: LUME_TOKEN is required");
   process.exit(1);
+}
+
+const GENERATED_LUME_PASSWORD = crypto.randomBytes(24).toString("base64url");
+const LUME_PASSWORD = process.env.LUME_PASSWORD || GENERATED_LUME_PASSWORD;
+if (!process.env.LUME_PASSWORD) {
+  console.log("⚠️  LUME_PASSWORD not set. Generated temporary password:");
+  console.log(`   ${LUME_PASSWORD}`);
+}
+
+const SESSION_SECRET = crypto.createHash("sha256").update(`${TOKEN}:${LUME_PASSWORD}`).digest("hex");
+const SESSION_COOKIE = "lume_session";
+const sessionTokens = new Set();
+
+function signToken(token) {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(token).digest("hex");
+}
+
+function encodeSession(token) {
+  return `${token}.${signToken(token)}`;
+}
+
+function decodeSession(value) {
+  if (!value || typeof value !== "string") return null;
+  const i = value.lastIndexOf(".");
+  if (i <= 0) return null;
+  const token = value.slice(0, i);
+  const sig = value.slice(i + 1);
+  const expectedSig = signToken(token);
+  try {
+    const a = Buffer.from(sig, "utf8");
+    const b = Buffer.from(expectedSig, "utf8");
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
+  return token;
+}
+
+function getBearerToken(req) {
+  const auth = req.headers["authorization"] || "";
+  return auth.startsWith("Bearer ") ? auth.slice(7) : "";
+}
+
+function getSessionTokenFromCookie(req) {
+  const raw = req.headers.cookie || "";
+  const cookies = cookie.parse(raw);
+  const packed = cookies[SESSION_COOKIE];
+  return decodeSession(packed);
 }
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
@@ -102,10 +152,26 @@ const MIME = {
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 function isAuthed(req) {
-  const auth = req.headers["authorization"] || "";
-  if (auth === `Bearer ${TOKEN}`) return true;
-  const url = new URL(req.url, "http://x");
-  return url.searchParams.get("token") === TOKEN;
+  const bearer = getBearerToken(req);
+  if (bearer === TOKEN) return true;
+  if (bearer && sessionTokens.has(bearer)) return true;
+
+  const sessionToken = getSessionTokenFromCookie(req);
+  if (sessionToken && sessionTokens.has(sessionToken)) return true;
+
+  return false;
+}
+
+function isPublicRoute(req, path) {
+  if (req.method === "GET" && path === "/auth/login") return true;
+  if (req.method === "POST" && path === "/auth/login") return true;
+  if (req.method === "GET" && path.startsWith("/share/")) return true;
+  return false;
+}
+
+function isBrowserPageRequest(req) {
+  const accept = req.headers.accept || "";
+  return req.method === "GET" && accept.includes("text/html");
 }
 
 // ─── Request body helper ──────────────────────────────────────────────────────
@@ -117,10 +183,11 @@ function readBody(req) {
   });
 }
 
-function json(res, status, data) {
+function json(res, status, data, headers = {}) {
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": CORS_ORIGIN,
+    ...headers,
   });
   res.end(JSON.stringify(data));
 }
@@ -183,10 +250,74 @@ const server = createServer(async (req, res) => {
     return res.end();
   }
 
+  // Public auth route: login page
+  if (req.method === "GET" && path === "/auth/login") {
+    if (isAuthed(req)) {
+      res.writeHead(302, { Location: "/" });
+      return res.end();
+    }
+    const loginPath = join(CLIENT_DIR, "login.html");
+    if (existsSync(loginPath)) {
+      res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+      return res.end(readFileSync(loginPath));
+    }
+    res.writeHead(500);
+    return res.end("Missing login page");
+  }
+
+  // Public auth route: login API
+  if (req.method === "POST" && path === "/auth/login") {
+    const body = await readBody(req);
+    const bodyJson = body.length ? (() => { try { return JSON.parse(body); } catch { return {}; } })() : {};
+
+    if (!bodyJson.password || bodyJson.password !== LUME_PASSWORD) {
+      return json(res, 401, { ok: false, error: "Incorrect password" });
+    }
+
+    const sessionToken = crypto.randomBytes(32).toString("base64url");
+    sessionTokens.add(sessionToken);
+    const packed = encodeSession(sessionToken);
+
+    const cookieHeader = cookie.serialize(SESSION_COOKIE, packed, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+
+    return json(res, 200, { ok: true, token: sessionToken }, { "Set-Cookie": cookieHeader });
+  }
+
+  // Public auth route: logout API (doesn't require auth)
+  if (req.method === "POST" && path === "/auth/logout") {
+    const sessionToken = getSessionTokenFromCookie(req);
+    const bearer = getBearerToken(req);
+    if (sessionToken) sessionTokens.delete(sessionToken);
+    if (bearer && bearer !== TOKEN) sessionTokens.delete(bearer);
+
+    const clearCookie = cookie.serialize(SESSION_COOKIE, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      path: "/",
+      maxAge: 0,
+    });
+
+    return json(res, 200, { ok: true }, { "Set-Cookie": clearCookie });
+  }
+
+  // Global auth guard (protect existing routes; keep /share/* public)
+  if (!isPublicRoute(req, path) && !isAuthed(req)) {
+    if (path === "/" || isBrowserPageRequest(req)) {
+      res.writeHead(302, { Location: "/auth/login" });
+      return res.end();
+    }
+    return json(res, 401, { error: "Unauthorized" });
+  }
+
   // ── /api/* requires auth ──
   if (path.startsWith("/api/")) {
-    if (!isAuthed(req)) return json(res, 401, { error: "Unauthorized" });
-
     const clientIp = req.socket.remoteAddress || 'unknown';
     if (!checkRateLimit(clientIp)) return json(res, 429, { error: 'Rate limit exceeded' });
 
@@ -258,17 +389,14 @@ const server = createServer(async (req, res) => {
   }
 
   // ── /ws WebSocket upgrade ──
-  if (path === "/ws") {
-    if (!isAuthed(req)) { res.writeHead(401); return res.end("Unauthorized"); }
-    return; // handled by upgrade event below
-  }
+  if (path === "/ws") return;
 
   // ── /config.js — exposes public config to client ──
   if (path === "/config.js") {
     const wsProto = "ws";
     const wsHost  = req.headers.host || `localhost:${PORT}`;
     res.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-cache" });
-    return res.end(`window.CYAN_CONFIG = { wsUrl: "${wsProto}://${wsHost}/ws?token=${TOKEN}", token: "${TOKEN}" };`);
+    return res.end(`window.CYAN_CONFIG = { wsUrl: "${wsProto}://${wsHost}/ws", token: "" };`);
   }
 
   // ── Static files (/lab/* and client files) ──
@@ -291,9 +419,10 @@ const server = createServer(async (req, res) => {
 
 // ── WebSocket upgrade ──
 server.on("upgrade", (req, socket, head) => {
-  const url = new URL(req.url, "http://x");
-  const token = req.headers["authorization"]?.replace("Bearer ", "") || url.searchParams.get("token");
-  if (token !== TOKEN) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); return socket.destroy(); }
+  const bearer = getBearerToken(req);
+  const cookieToken = getSessionTokenFromCookie(req);
+  const valid = bearer === TOKEN || (bearer && sessionTokens.has(bearer)) || (cookieToken && sessionTokens.has(cookieToken));
+  if (!valid) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); return socket.destroy(); }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });
 
