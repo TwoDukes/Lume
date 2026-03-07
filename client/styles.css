@@ -813,3 +813,7 @@ body {
   .right-col { border-left: none; }
   .panel-feed { max-height: 40vh; }
 }
+
+/* Allow pinch-zoom on charts only */
+body { touch-action: pan-y; }
+.canvas-chart-block { touch-action: pinch-zoom; }
