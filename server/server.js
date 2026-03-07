@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createServer, request as httpRequest } from "http";
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync, statSync } from "fs";
 import { join, extname, dirname } from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
@@ -91,9 +91,11 @@ setInterval(() => {
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIR  = join(__dir, "../client");
 const STATE_DIR   = join(__dir, "state");
+const SNAPSHOT_DIR = join(STATE_DIR, "snapshots");
 const LAB_DIR     = join(__dir, "../lab");
 
 mkdirSync(STATE_DIR, { recursive: true });
+mkdirSync(SNAPSHOT_DIR, { recursive: true });
 
 // ─── State ────────────────────────────────────────────────────────────────────
 function stateFile(name) { return join(STATE_DIR, name + ".json"); }
@@ -172,6 +174,32 @@ function isPublicRoute(req, path) {
 function isBrowserPageRequest(req) {
   const accept = req.headers.accept || "";
   return req.method === "GET" && accept.includes("text/html");
+}
+
+function slugifyName(name) {
+  const normalized = String(name || "")
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized;
+}
+
+function isValidSlug(slug) {
+  return /^[a-z0-9-]+$/.test(slug);
+}
+
+function unslug(slug) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(" ");
+}
+
+function getSnapshotPath(slug) {
+  return join(SNAPSHOT_DIR, `${slug}.json`);
 }
 
 // ─── Request body helper ──────────────────────────────────────────────────────
@@ -385,11 +413,101 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    if (path === "/api/canvas/snapshot" && req.method === "POST") {
+      const rawName = typeof bodyJson.name === "string" ? bodyJson.name.trim() : "";
+      const slug = slugifyName(rawName);
+      if (!slug || !isValidSlug(slug)) return json(res, 400, { error: "Valid name is required" });
+
+      const snapshot = {
+        name: rawName || unslug(slug),
+        slug,
+        savedAt: new Date().toISOString(),
+        canvas: canvas || loadState("canvas", null),
+      };
+
+      writeFileSync(getSnapshotPath(slug), JSON.stringify(snapshot, null, 2));
+      return json(res, 200, { ok: true, slug, shareUrl: `/share/${slug}` });
+    }
+
+    if (path === "/api/canvas/snapshots" && req.method === "GET") {
+      const list = readdirSync(SNAPSHOT_DIR)
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => {
+          const slug = f.slice(0, -5);
+          if (!isValidSlug(slug)) return null;
+          const filePath = getSnapshotPath(slug);
+          let parsed = null;
+          try { parsed = JSON.parse(readFileSync(filePath, "utf8")); } catch {}
+          const stat = statSync(filePath);
+          const savedAt = parsed?.savedAt || stat.mtime.toISOString();
+          const name = parsed?.name || unslug(slug);
+          return { name, slug, shareUrl: `/share/${slug}`, savedAt };
+        })
+        .filter(Boolean)
+        .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+
+      return json(res, 200, list);
+    }
+
+    if (path.startsWith("/api/canvas/snapshots/") && req.method === "DELETE") {
+      const slug = decodeURIComponent(path.slice("/api/canvas/snapshots/".length));
+      if (!isValidSlug(slug)) return json(res, 400, { error: "Invalid slug" });
+
+      const filePath = getSnapshotPath(slug);
+      if (!existsSync(filePath)) return json(res, 404, { error: "Snapshot not found" });
+      unlinkSync(filePath);
+      return json(res, 200, { ok: true });
+    }
+
     return json(res, 404, { error: "Not found" });
   }
 
   // ── /ws WebSocket upgrade ──
   if (path === "/ws") return;
+
+  // ── Public snapshot share page ──
+  if (req.method === "GET" && path.startsWith("/share/")) {
+    const slug = decodeURIComponent(path.slice("/share/".length));
+    if (!isValidSlug(slug)) {
+      res.writeHead(404, { "Content-Type": "text/html" });
+      return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Snapshot not found</h1><p>Invalid or missing share link.</p></body></html>');
+    }
+
+    const snapshotPath = getSnapshotPath(slug);
+    if (!existsSync(snapshotPath)) {
+      res.writeHead(404, { "Content-Type": "text/html" });
+      return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Snapshot not found</h1><p>This shared canvas does not exist.</p></body></html>');
+    }
+
+    let snapshot;
+    try {
+      snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/html" });
+      return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Snapshot unavailable</h1><p>This snapshot could not be loaded.</p></body></html>');
+    }
+
+    const payload = {
+      name: snapshot?.name || unslug(slug),
+      slug,
+      savedAt: snapshot?.savedAt || null,
+      canvas: Object.prototype.hasOwnProperty.call(snapshot || {}, "canvas") ? snapshot.canvas : snapshot,
+    };
+
+    const sharePath = join(CLIENT_DIR, "share.html");
+    if (!existsSync(sharePath)) {
+      res.writeHead(500);
+      return res.end("Missing share page");
+    }
+
+    const html = readFileSync(sharePath, "utf8").replace(
+      "__LUME_SHARE_DATA__",
+      JSON.stringify(payload).replace(/</g, "\\u003c")
+    );
+
+    res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+    return res.end(html);
+  }
 
   // ── /config.js — exposes public config to client ──
   if (path === "/config.js") {
