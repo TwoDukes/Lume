@@ -773,9 +773,18 @@ function renderMarkdown(md) {
 // --- API helper ---
 async function apiFetch(path, opts = {}) {
   const cfg = window.CYAN_CONFIG || {};
+  const storedToken = localStorage.getItem('lume_token');
+  const authToken = cfg.token || storedToken;
+
   opts.headers = opts.headers || {};
-  if (cfg.token) opts.headers['Authorization'] = `Bearer ${cfg.token}`;
+  if (authToken) opts.headers['Authorization'] = `Bearer ${authToken}`;
+
   const res = await fetch(path, opts);
+  if (res.status === 401) {
+    localStorage.removeItem('lume_token');
+    window.location.replace('/auth/login');
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) throw new Error(`API ${res.status}`);
   const ct = res.headers.get('content-type');
   if (ct && ct.includes('json')) return res.json();

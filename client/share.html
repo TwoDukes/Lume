@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Lume Share</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  html, body { overflow: auto; height: auto; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  .share-page { width: min(980px, 100% - 24px); margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; }
+  .share-header { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #1e1e1e; gap:12px; }
+  .brand { color: var(--cyan); font-weight:700; letter-spacing:1px; }
+  .share-title-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .share-title { font-size:0.85rem; color:var(--text); font-weight:600; }
+  .share-badge { font-size:0.65rem; color:var(--text-dim); border:1px solid #2a2a2a; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:0.6px; }
+  .share-main { flex:1; padding:14px 0 24px; }
+  .canvas-content { font-size: 0.92rem; }
+  .share-footer { color:var(--text-dimmer); font-size:0.72rem; text-align:center; padding:12px 0 18px; border-top:1px solid #111; }
+</style>
+</head>
+<body>
+  <div class="share-page">
+    <header class="share-header">
+      <div class="brand">🔵 Lume</div>
+      <div class="share-title-wrap">
+        <div id="snapshot-name" class="share-title">Snapshot</div>
+        <span class="share-badge">Shared canvas — read only</span>
+      </div>
+    </header>
+
+    <main class="share-main">
+      <div class="canvas-content" id="canvas-content">
+        <div class="empty-state"><div class="empty-state-icon">🔵</div><div>Canvas is empty</div></div>
+      </div>
+    </main>
+
+    <footer class="share-footer">Created with Lume</footer>
+  </div>
+
+<script>
+  window.LUME_SHARE_DATA = __LUME_SHARE_DATA__;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+let mermaidCounter = 0;
+let activeCharts = [];
+if (typeof marked !== 'undefined') marked.setOptions({ breaks: true, gfm: true });
+if (typeof mermaid !== 'undefined') {
+  mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: {
+    primaryColor: '#00BCD4', primaryTextColor: '#e0e0e0', primaryBorderColor: '#1e1e1e',
+    lineColor: '#444', secondaryColor: '#111', tertiaryColor: '#111',
+    background: '#000', mainBkg: '#111', nodeBorder: '#1e1e1e'
+  }});
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function renderMarkdown(md) { return typeof marked !== 'undefined' ? marked.parse(md) : esc(md || ''); }
+function renderSingleBlock(block) {
+  const content = block.content || '';
+  const html = block.html || (block.type === 'html' ? content : '');
+  const md = block.markdown || (block.type === 'markdown' ? content : '');
+  const text = block.text || (block.type === 'text' ? content : '');
+  if (html) return html;
+  if (md) return renderMarkdown(md);
+  if (text) return `<p>${esc(text)}</p>`;
+  return '';
+}
+
+function blockHTML(block) {
+  switch (block.type) {
+    case 'markdown':
+      return `<div class="canvas-block">${renderMarkdown(block.content || '')}</div>`;
+    case 'code': {
+      const lang = block.language || '';
+      const langLabel = lang ? `<span class="code-lang">${esc(lang)}</span>` : '';
+      const codeId = 'code-' + Math.random().toString(36).slice(2, 8);
+      const title = block.title ? `<div class="code-title">${esc(block.title)}</div>` : '';
+      return `<div class="canvas-block canvas-code-block">${title}<div class="code-header">${langLabel}<button class="code-copy" onclick="copyCode('${codeId}')">Copy</button></div><pre><code id="${codeId}" class="language-${esc(lang)}">${esc(block.content || '')}</code></pre></div>`;
+    }
+    case 'chart': {
+      const chartId = 'chart-' + Math.random().toString(36).slice(2, 8);
+      return `<div class="canvas-block canvas-chart-block"><div class="chart-wrapper"><button class="chart-expand-btn" onclick="expandChart('${chartId}')" title="Fullscreen">⛶</button><canvas id="${chartId}" data-chart='${JSON.stringify(block.config || {})}'></canvas></div></div>`;
+    }
+    case 'image':
+      return `<div class="canvas-block canvas-image-block"><img src="${escAttr(block.url || '')}" alt="${escAttr(block.caption || '')}" loading="lazy">${block.caption ? `<div class="image-caption">${esc(block.caption)}</div>` : ''}</div>`;
+    case 'divider':
+      return '<hr class="canvas-divider">';
+    case 'table': {
+      const ths = (block.headers || []).map(h => `<th>${esc(h)}</th>`).join('');
+      const trs = (block.rows || []).map(row => '<tr>' + row.map(cell => `<td>${esc(cell)}</td>`).join('') + '</tr>').join('');
+      return `<div class="canvas-block canvas-table-block"><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+    }
+    case 'math': {
+      const mathId = 'math-' + Math.random().toString(36).slice(2, 8);
+      const mathCls = block.display !== false ? ' display' : '';
+      return `<div class="canvas-block canvas-math-block${mathCls}" id="${mathId}" data-math="${escAttr(block.content || '')}" data-display="${block.display !== false}"></div>`;
+    }
+    case 'mermaid': {
+      const mermaidId = 'mermaid-' + (mermaidCounter++);
+      return `<div class="canvas-block canvas-mermaid-wrapper"><div class="canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}"></div><button class="chart-expand-btn" onclick="expandMermaid('${mermaidId}')" title="Fullscreen">⛶</button></div>`;
+    }
+    case 'collapsible':
+      return `<div class="canvas-block"><details class="canvas-collapsible"><summary>${esc(block.title || 'Details')}</summary><div class="collapsible-body">${(block.blocks || []).map(blockHTML).join('')}</div></details></div>`;
+    case 'iframe':
+      return `<div class="canvas-block canvas-iframe-block"><iframe src="${escAttr(block.url || '')}" style="height:${block.height || 400}px" sandbox="allow-scripts allow-same-origin allow-popups" allowfullscreen loading="lazy"></iframe></div>`;
+    case 'html':
+      return `<div class="canvas-block">${block.content || ''}</div>`;
+    case 'text':
+      return `<div class="canvas-block"><p>${esc(block.content || '')}</p></div>`;
+    default: {
+      const fallback = renderSingleBlock(block);
+      return fallback ? `<div class="canvas-block">${fallback}</div>` : '';
+    }
+  }
+}
+
+function initCanvasBlocks(container) {
+  if (typeof Chart !== 'undefined') {
+    container.querySelectorAll('canvas[data-chart]').forEach(el => {
+      if (el._chartInit) return;
+      el._chartInit = true;
+      try {
+        const config = JSON.parse(el.dataset.chart);
+        config.options = config.options || {};
+        config.options.responsive = true;
+        config.options.maintainAspectRatio = false;
+        config.options.plugins = config.options.plugins || {};
+        config.options.plugins.legend = config.options.plugins.legend || {};
+        config.options.plugins.legend.labels = { color: '#888' };
+        config.options.scales = config.options.scales || {};
+        for (const axis of ['x', 'y']) {
+          config.options.scales[axis] = config.options.scales[axis] || {};
+          config.options.scales[axis].ticks = { color: '#555' };
+          config.options.scales[axis].grid = { color: '#1e1e1e' };
+        }
+        activeCharts.push(new Chart(el, config));
+      } catch (e) { console.error('Chart init failed:', e); }
+    });
+  }
+
+  if (typeof hljs !== 'undefined') {
+    container.querySelectorAll('pre code[class*="language-"]').forEach(el => {
+      if (el._hljsInit) return;
+      el._hljsInit = true;
+      hljs.highlightElement(el);
+    });
+  }
+
+  if (typeof katex !== 'undefined') {
+    container.querySelectorAll('[data-math]').forEach(el => {
+      if (el._katexInit) return;
+      el._katexInit = true;
+      try { katex.render(el.dataset.math, el, { displayMode: el.dataset.display === 'true', throwOnError: false }); }
+      catch { el.textContent = el.dataset.math; }
+    });
+  }
+
+  if (typeof mermaid !== 'undefined') {
+    container.querySelectorAll('[data-mermaid]').forEach(el => {
+      if (el._mermaidInit) return;
+      el._mermaidInit = true;
+      const id = el.id || 'mmd-' + Math.random().toString(36).slice(2, 8);
+      mermaid.render(id + '-svg', el.dataset.mermaid).then(({ svg }) => { el.innerHTML = svg; })
+        .catch(e => { el.innerHTML = `<pre style="color:var(--red);font-size:0.8em">${esc(e.message || 'Mermaid error')}</pre>`; });
+    });
+  }
+
+  container.querySelectorAll('.collapsible-body').forEach(body => {
+    if (body._nestedInit) return;
+    body._nestedInit = true;
+    initCanvasBlocks(body);
+  });
+}
+
+function copyCode(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = el.closest('.canvas-code-block')?.querySelector('.code-copy');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1200); }
+  });
+}
+
+function expandChart(chartId) {
+  const orig = document.getElementById(chartId);
+  if (!orig) return;
+  const config = JSON.parse(orig.dataset.chart || '{}');
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay';
+  overlay.innerHTML = `<div class="chart-overlay-inner"><button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button><canvas id="${chartId}-full"></canvas></div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  if (typeof Chart !== 'undefined') new Chart(overlay.querySelector('canvas'), config);
+}
+
+function expandMermaid(id) {
+  const orig = document.getElementById(id);
+  const svg = orig?.querySelector('svg');
+  if (!svg) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay';
+  overlay.innerHTML = `<div class="chart-overlay-inner"><button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button></div>`;
+  const cloned = svg.cloneNode(true);
+  cloned.style.width = '100%';
+  overlay.querySelector('.chart-overlay-inner').appendChild(cloned);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function renderShare() {
+  const data = window.LUME_SHARE_DATA || {};
+  const nameEl = document.getElementById('snapshot-name');
+  nameEl.textContent = data.name || data.slug || 'Snapshot';
+
+  const canvas = data.canvas;
+  const container = document.getElementById('canvas-content');
+  if (!canvas) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔵</div><div>Canvas is empty</div></div>';
+    return;
+  }
+
+  if (canvas.type === 'blocks' && Array.isArray(canvas.blocks)) {
+    container.innerHTML = canvas.blocks.map(blockHTML).join('');
+  } else {
+    const rendered = renderSingleBlock(canvas);
+    container.innerHTML = rendered ? `<div class="canvas-block">${rendered}</div>` : '<div class="empty-state"><div class="empty-state-icon">🔵</div><div>Canvas is empty</div></div>';
+  }
+  initCanvasBlocks(container);
+}
+
+renderShare();
+window.copyCode = copyCode;
+window.expandChart = expandChart;
+window.expandMermaid = expandMermaid;
+</script>
+</body>
+</html>

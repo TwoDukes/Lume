@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lume Login</title>
+  <style>
+    :root {
+      --bg: #050607;
+      --card: #101317;
+      --border: #1d252c;
+      --text: #e8edf2;
+      --muted: #8a9aa8;
+      --cyan: #00BCD4;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(1200px 600px at 50% -20%, #0c1a24 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(420px, 100%);
+      background: color-mix(in oklab, var(--card) 92%, black);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: .4px;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 20px;
+      font-size: .95rem;
+    }
+    form { display: grid; gap: 12px; }
+    input {
+      width: 100%;
+      background: #0c1116;
+      color: var(--text);
+      border: 1px solid #25303a;
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+      font-size: 15px;
+    }
+    input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(0,188,212,.2);
+    }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--cyan);
+      color: #061014;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+      transition: filter .15s ease;
+    }
+    button:hover { filter: brightness(1.08); }
+    .error {
+      min-height: 18px;
+      color: var(--err);
+      font-size: .9rem;
+      margin-top: 2px;
+    }
+    .shake { animation: shake .32s linear; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="card">
+      <div class="brand"><span class="dot"></span> Lume</div>
+      <div class="subtitle">Sign in to your dashboard</div>
+      <form id="login-form">
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
+        <button type="submit">Sign in</button>
+      </form>
+      <div class="error" id="error"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const passwordInput = document.getElementById('password');
+    const errorEl = document.getElementById('error');
+    const card = document.getElementById('card');
+
+    async function hasValidSession() {
+      try {
+        const token = localStorage.getItem('lume_token') || '';
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch('/api/feed', { headers });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    (async () => {
+      if (await hasValidSession()) {
+        window.location.replace('/');
+      }
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: passwordInput.value })
+        });
+
+        if (!res.ok) throw new Error('bad_password');
+        const data = await res.json().catch(() => ({}));
+        if (data.token) localStorage.setItem('lume_token', data.token);
+        window.location.replace('/');
+      } catch {
+        card.classList.remove('shake');
+        void card.offsetWidth;
+        card.classList.add('shake');
+        errorEl.textContent = 'Incorrect password';
+      }
+    });
+  </script>
+</body>
+</html>
