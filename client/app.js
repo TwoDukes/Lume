@@ -615,7 +615,8 @@ function expandMermaid(id) {
   closeBtn.className = 'chart-overlay-close';
   closeBtn.textContent = '✕';
   closeBtn.onclick = () => overlay.remove();
-  closeBtn.addEventListener('touchend', e => { e.stopPropagation(); overlay.remove(); });
+  closeBtn.addEventListener('touchstart', e => { e.stopPropagation(); }, { passive: true });
+  closeBtn.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); overlay.remove(); });
 
   const zoomArea = document.createElement('div');
   zoomArea.className = 'mermaid-zoom-area';
