@@ -381,12 +381,19 @@ body {
   position: relative;
   overflow: hidden;
 }
-.action-btn.running .action-icon {
-  animation: spin 1s linear infinite;
-}
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: var(--cyan, #00BCD4);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
 }
 .action-btn.running::after {
   content: '';

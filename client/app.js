@@ -126,10 +126,24 @@ function handleMessage(msg) {
     case 'canvas':
       canvasData = data;
       renderCanvas();
+      // Restore any running action button
+      document.querySelectorAll('.action-btn.running').forEach(btn => {
+        const origHTML = btn.dataset.origHtml;
+        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+        btn.classList.remove('running');
+        btn.style.borderColor = '';
+      });
       break;
 
     case 'canvas_append':
       appendCanvas(data);
+      // Restore any running action button
+      document.querySelectorAll('.action-btn.running').forEach(btn => {
+        const origHTML = btn.dataset.origHtml;
+        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+        btn.classList.remove('running');
+        btn.style.borderColor = '';
+      });
       break;
 
     case 'canvas_clear':
@@ -252,28 +266,32 @@ function renderActions() {
 }
 
 async function triggerAction(id, btn) {
-  let origHTML = '';
   let runningTimeout = null;
   if (btn) {
-    origHTML = btn.innerHTML;
+    btn.dataset.origHtml = btn.innerHTML;
     btn.classList.add('running');
-    btn.innerHTML = '<div class="action-icon">⟳</div>Loading...';
-    runningTimeout = setTimeout(() => btn.classList.remove('running'), 1800000);
+    btn.innerHTML = '<div class="action-icon"><span class="btn-spinner"></span></div>';
+    runningTimeout = setTimeout(() => {
+      const origHTML = btn.dataset.origHtml;
+      if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+      btn.classList.remove('running');
+      btn.style.borderColor = '';
+    }, 1800000);
   }
   try {
-    const res = await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
-    if (res && res.result) showActionResult({ id, result: res.result });
-    if (btn) {
-      btn.innerHTML = origHTML;
-      btn.classList.remove('running');
-      if (runningTimeout) clearTimeout(runningTimeout);
-    }
+    await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
   } catch (e) {
     console.error('Action failed:', e);
     if (btn) {
+      const origHTML = btn.dataset.origHtml || '';
       btn.innerHTML = '<div class="action-icon">✕</div>Error';
       btn.style.borderColor = 'var(--red, #F44336)';
-      setTimeout(() => { btn.innerHTML = origHTML; btn.style.borderColor = ''; btn.classList.remove('running'); }, 2000);
+      setTimeout(() => {
+        if (origHTML) btn.innerHTML = origHTML;
+        delete btn.dataset.origHtml;
+        btn.style.borderColor = '';
+        btn.classList.remove('running');
+      }, 2000);
       if (runningTimeout) clearTimeout(runningTimeout);
     }
   }
