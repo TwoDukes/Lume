@@ -168,6 +168,8 @@ function isPublicRoute(req, path) {
   if (req.method === "GET" && path === "/auth/login") return true;
   if (req.method === "POST" && path === "/auth/login") return true;
   if (req.method === "GET" && path.startsWith("/share/")) return true;
+  // Static assets needed by share page (no sensitive content)
+  if (req.method === "GET" && /\.(css|js|ico|png|woff2?|ttf|svg)$/.test(path)) return true;
   return false;
 }
 
