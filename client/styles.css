@@ -594,7 +594,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 12px;
+  touch-action: none;
 }
 .chart-overlay-inner {
   position: relative;
@@ -821,4 +822,16 @@ body { touch-action: pan-y; }
 /* Mermaid expand */
 .canvas-mermaid-wrapper { position: relative; touch-action: pinch-zoom; }
 .canvas-mermaid-wrapper .chart-expand-btn { top: 8px; right: 8px; }
-.mermaid-overlay-inner svg { width: 100%; height: auto; max-height: 80vh; }
+.mermaid-overlay-inner {
+  overflow: auto;
+  touch-action: pinch-zoom pan-x pan-y;
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mermaid-overlay-inner svg {
+  width: 100%;
+  height: auto;
+  min-width: 600px;
+}
