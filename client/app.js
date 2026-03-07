@@ -900,11 +900,16 @@ function showToast(message, type = 'success', durationMs = 6000) {
 }
 
 async function shareCanvas() {
-  const rawName = window.prompt('Name this canvas:', 'my-canvas');
-  if (rawName === null) return;
-
-  const name = rawName.trim();
-  if (!name) return;
+  // Auto-generate name from first heading in canvas, fallback to timestamp
+  function autoName() {
+    const first = document.querySelector('.canvas-content .canvas-block');
+    if (first) {
+      const h = first.querySelector('h1,h2,h3');
+      if (h) return h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    }
+    return 'canvas-' + new Date().toISOString().slice(0,10);
+  }
+  const name = autoName();
 
   const shareBtn = $('share-btn');
   if (shareBtn) shareBtn.disabled = true;
