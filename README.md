@@ -53,6 +53,9 @@ Edit `.env`:
 ```env
 LUME_TOKEN=your-secret-token-here
 
+# Dashboard login password (auto-generated and logged on first run if not set)
+LUME_PASSWORD=your-dashboard-password
+
 # Optional: OpenClaw gateway for action button handlers
 OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
 OPENCLAW_GATEWAY_TOKEN=your-gateway-token
@@ -64,7 +67,7 @@ OPENCLAW_GATEWAY_TOKEN=your-gateway-token
 npm start
 ```
 
-Open `http://localhost:7777` in your browser.
+Open `http://localhost:7777` in your browser. You'll be prompted to log in with your `LUME_PASSWORD`. Your session persists via localStorage — you won't need to log in again unless you clear storage or restart without a password set.
 
 ### 4. Connect your AI
 
@@ -154,6 +157,33 @@ All endpoints require `Authorization: Bearer <token>` (or `?token=<token>` in th
 | `PUT` | `/api/canvas` | Replace entire canvas |
 | `POST` | `/api/canvas/block` | Append a block (progressive) |
 | `DELETE` | `/api/canvas` | Clear canvas |
+| `POST` | `/api/canvas/snapshot` | Save a named snapshot of the current canvas |
+| `GET` | `/api/canvas/snapshots` | List all saved snapshots |
+| `DELETE` | `/api/canvas/snapshots/:slug` | Delete a snapshot |
+
+**Snapshot schema:**
+```json
+{ "name": "my-research" }
+```
+Returns `{ "ok": true, "slug": "my-research", "shareUrl": "/share/my-research" }`.
+
+### Sharing
+
+Snapshots are point-in-time copies of the canvas. Each gets a public URL at `/share/:slug` — no auth required, no token in the page source. Safe to share with anyone.
+
+```bash
+# Save a snapshot
+curl -X POST http://localhost:7777/api/canvas/snapshot \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"weekly-report"}'
+
+# Share: http://localhost:7777/share/weekly-report
+```
+
+You can also hit the **🔗 Share** button in the canvas header — it auto-names from the first heading and shows a copyable link.
+
+To update a share link, just snapshot again with the same name. It overwrites.
 
 ---
 
@@ -294,6 +324,20 @@ Markdown blocks render HTML, which means you can embed styled buttons:
   → Link Button
 </a>
 ```
+
+---
+
+## Auth
+
+The dashboard is protected by a password login page. The `LUME_TOKEN` (used by your AI agent) is separate from the browser login and never exposed in the frontend.
+
+| Surface | Auth method |
+|---------|-------------|
+| Browser dashboard | `LUME_PASSWORD` → session cookie + localStorage |
+| AI agent API calls | `Authorization: Bearer LUME_TOKEN` header |
+| Share pages (`/share/*`) | None — public read-only |
+
+If `LUME_PASSWORD` is not set, a random password is generated and printed to the server log on startup.
 
 ---
 
