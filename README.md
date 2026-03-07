@@ -92,17 +92,19 @@ curl -X POST http://localhost:7777/api/canvas/block \
 ## Architecture
 
 ```
-┌─────────────────────────────┐      REST + WebSocket
-│         AI Agent            │ ────────────────────────→  Lume Server (Node.js)
-│  (Claude, GPT, Gemini, etc) │                                    │
-└─────────────────────────────┘                            WebSocket broadcast
-                                                                    ↓
-                                                         ┌──────────────────────┐
-                                                         │    Browser / Phone   │
-                                                         │   (Lume Frontend)    │
-                                                         │  Feed │ Actions │    │
-                                                         │        Canvas        │
-                                                         └──────────────────────┘
+┌─────────────────────────────┐   Bearer token (REST + WebSocket)
+│         AI Agent            │ ──────────────────────────────────→ Lume Server (Node.js)
+│  (Claude, GPT, Gemini, etc) │                                             │
+└─────────────────────────────┘                                     WebSocket broadcast
+                                                                             │
+                                             ┌───────────────────────────────┤
+                                             ↓                               ↓
+                                  ┌─────────────────────┐     ┌─────────────────────────┐
+                                  │  Browser / Phone     │     │   Public Share Page      │
+                                  │  (password login)    │     │   /share/:slug           │
+                                  │  Feed │ Actions │    │     │   (no auth, read-only)   │
+                                  │       Canvas         │     └─────────────────────────┘
+                                  └─────────────────────┘
 ```
 
 Lume is **model-agnostic**. Any agent that can make HTTP requests can drive it.
