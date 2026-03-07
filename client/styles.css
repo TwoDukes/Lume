@@ -583,6 +583,7 @@ body {
   z-index: 2;
 }
 .chart-wrapper:hover .chart-expand-btn { opacity: 1; }
+@media (hover: none) { .chart-expand-btn { opacity: 1; } }
 
 /* Fullscreen overlay */
 .chart-overlay {
