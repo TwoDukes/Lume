@@ -556,7 +556,7 @@ body {
 }
 .canvas-chart-block canvas {
   width: 100% !important;
-  height: 280px !important;
+  height: 320px !important;
   max-height: none;
 }
 
@@ -815,9 +815,9 @@ body {
   .panel-feed { max-height: 40vh; }
 }
 
-/* Allow pinch-zoom on charts only */
+/* Scroll works everywhere; mermaid wrapper handles its own touch */
 body { touch-action: pan-y; }
-.canvas-chart-block { touch-action: pinch-zoom; }
+.canvas-chart-block { touch-action: pan-y; }
 
 /* Mermaid expand */
 .canvas-mermaid-wrapper { position: relative; touch-action: pinch-zoom; }
