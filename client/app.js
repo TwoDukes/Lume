@@ -615,8 +615,11 @@ function expandMermaid(id) {
   closeBtn.className = 'chart-overlay-close';
   closeBtn.textContent = '✕';
   closeBtn.onclick = () => overlay.remove();
-  closeBtn.addEventListener('touchstart', e => { e.stopPropagation(); }, { passive: true });
-  closeBtn.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); overlay.remove(); });
+
+  // Header row above zoomArea — no overlap with touch surface
+  const header = document.createElement('div');
+  header.className = 'mermaid-modal-header';
+  header.appendChild(closeBtn);
 
   const zoomArea = document.createElement('div');
   zoomArea.className = 'mermaid-zoom-area';
@@ -626,7 +629,7 @@ function expandMermaid(id) {
   hint.className = 'mermaid-modal-hint';
   hint.textContent = '1 finger pan · 2 finger zoom · 2× tap reset';
 
-  modalBox.appendChild(closeBtn);
+  modalBox.appendChild(header);
   modalBox.appendChild(zoomArea);
   modalBox.appendChild(hint);
   overlay.appendChild(modalBox);
