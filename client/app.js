@@ -404,7 +404,10 @@ function blockHTML(block) {
     case 'chart':
       const chartId = 'chart-' + Math.random().toString(36).slice(2, 8);
       return `<div class="canvas-block canvas-chart-block">
-        <canvas id="${chartId}" data-chart='${JSON.stringify(block.config || {})}'></canvas>
+        <div class="chart-wrapper">
+          <button class="chart-expand-btn" onclick="expandChart('${chartId}')" title="Fullscreen">⛶</button>
+          <canvas id="${chartId}" data-chart='${JSON.stringify(block.config || {})}'></canvas>
+        </div>
       </div>`;
 
     case 'image':
@@ -549,7 +552,41 @@ function copyCode(id) {
     }
   });
 }
+
+function expandChart(chartId) {
+  const orig = document.getElementById(chartId);
+  if (!orig) return;
+  const config = JSON.parse(orig.dataset.chart || '{}');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay';
+  overlay.innerHTML = `<div class="chart-overlay-inner">
+    <button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button>
+    <canvas id="${chartId}-full"></canvas>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  if (typeof Chart !== 'undefined') {
+    const fullCanvas = overlay.querySelector('canvas');
+    // Apply same dark theme defaults as initCanvasBlocks
+    if (config.options) {
+      config.options.plugins = config.options.plugins || {};
+      config.options.plugins.legend = config.options.plugins.legend || {};
+      config.options.plugins.legend.labels = { color: '#888' };
+      config.options.scales = config.options.scales || {};
+      for (const axis of ['x', 'y']) {
+        config.options.scales[axis] = config.options.scales[axis] || {};
+        config.options.scales[axis].ticks = { color: '#555' };
+        config.options.scales[axis].grid = { color: '#1e1e1e' };
+      }
+    }
+    new Chart(fullCanvas, config);
+  }
+}
+
 window.copyCode = copyCode;
+window.expandChart = expandChart;
 
 // --- Markdown ---
 if (typeof marked !== 'undefined') {
