@@ -598,68 +598,148 @@ function expandMermaid(id) {
   if (!svg) return;
 
   const cloned = svg.cloneNode(true);
-  cloned.style.width = '100%';
-  cloned.style.height = 'auto';
-  cloned.style.transformOrigin = 'center center';
-  cloned.style.transition = 'transform 0.05s';
   cloned.removeAttribute('width');
   cloned.removeAttribute('height');
+  cloned.style.display = 'block';
+  cloned.style.width = '100%';
+  cloned.style.height = 'auto';
+  cloned.style.transformOrigin = '0 0';
 
   const overlay = document.createElement('div');
   overlay.className = 'chart-overlay mermaid-overlay';
 
-  const inner = document.createElement('div');
-  inner.className = 'chart-overlay-inner mermaid-overlay-inner';
+  const modalBox = document.createElement('div');
+  modalBox.className = 'mermaid-modal-box';
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'chart-overlay-close';
   closeBtn.textContent = '✕';
   closeBtn.onclick = () => overlay.remove();
 
-  inner.appendChild(closeBtn);
-  inner.appendChild(cloned);
-  overlay.appendChild(inner);
+  const zoomArea = document.createElement('div');
+  zoomArea.className = 'mermaid-zoom-area';
+  zoomArea.appendChild(cloned);
+
+  const hint = document.createElement('div');
+  hint.className = 'mermaid-modal-hint';
+  hint.textContent = '1 finger pan · 2 finger zoom · 2× tap reset';
+
+  modalBox.appendChild(closeBtn);
+  modalBox.appendChild(zoomArea);
+  modalBox.appendChild(hint);
+  overlay.appendChild(modalBox);
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+  modalBox.addEventListener('click', e => e.stopPropagation());
 
-  // JS pinch-zoom + pan via transform
-  let scale = 1, tx = 0, ty = 0;
-  let lastDist = 0, lastX = 0, lastY = 0;
+  const state = {
+    scale: 1,
+    tx: 0,
+    ty: 0,
+    lastTouches: null,
+    lastDist: null,
+    lastMid: null,
+    lastTap: 0,
+  };
+
+  const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+  const getDist = (t1, t2) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  const getMid = (t1, t2) => ({
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2,
+  });
 
   function applyTransform() {
-    cloned.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    cloned.style.transform = `translate(${state.tx}px,${state.ty}px) scale(${state.scale})`;
   }
 
-  inner.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      lastDist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-    } else if (e.touches.length === 1) {
-      lastX = e.touches[0].clientX;
-      lastY = e.touches[0].clientY;
-    }
+  function resetView() {
+    state.scale = 1;
+    state.tx = 0;
+    state.ty = 0;
+    state.lastTouches = null;
+    state.lastDist = null;
+    state.lastMid = null;
+    applyTransform();
+  }
+
+  applyTransform();
+
+  zoomArea.addEventListener('touchstart', e => {
     e.preventDefault();
+
+    const now = Date.now();
+    if (e.touches.length === 1) {
+      if (now - state.lastTap < 300) {
+        resetView();
+        state.lastTap = 0;
+        return;
+      }
+      state.lastTap = now;
+    }
+
+    state.lastTouches = Array.from(e.touches).map(t => ({ clientX: t.clientX, clientY: t.clientY }));
+
+    if (e.touches.length === 2) {
+      state.lastDist = getDist(e.touches[0], e.touches[1]);
+      state.lastMid = getMid(e.touches[0], e.touches[1]);
+    }
   }, { passive: false });
 
-  inner.addEventListener('touchmove', e => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      scale = Math.min(Math.max(scale * (dist / lastDist), 0.3), 8);
-      lastDist = dist;
-    } else if (e.touches.length === 1) {
-      tx += e.touches[0].clientX - lastX;
-      ty += e.touches[0].clientY - lastY;
-      lastX = e.touches[0].clientX;
-      lastY = e.touches[0].clientY;
-    }
-    applyTransform();
+  zoomArea.addEventListener('touchmove', e => {
     e.preventDefault();
+
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const prev = state.lastTouches && state.lastTouches[0];
+      if (prev) {
+        state.tx += t.clientX - prev.clientX;
+        state.ty += t.clientY - prev.clientY;
+        applyTransform();
+      }
+      state.lastTouches = [{ clientX: t.clientX, clientY: t.clientY }];
+      state.lastDist = null;
+      state.lastMid = null;
+      return;
+    }
+
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = getDist(t1, t2);
+      const mid = getMid(t1, t2);
+
+      if (state.lastDist && state.lastDist > 0) {
+        const rawFactor = dist / state.lastDist;
+        const nextScale = clamp(state.scale * rawFactor, 0.5, 8);
+        const factor = nextScale / state.scale;
+
+        state.tx = mid.x - (mid.x - state.tx) * factor;
+        state.ty = mid.y - (mid.y - state.ty) * factor;
+        state.scale = nextScale;
+        applyTransform();
+      }
+
+      state.lastDist = dist;
+      state.lastMid = mid;
+      state.lastTouches = [
+        { clientX: t1.clientX, clientY: t1.clientY },
+        { clientX: t2.clientX, clientY: t2.clientY },
+      ];
+    }
+  }, { passive: false });
+
+  zoomArea.addEventListener('touchend', e => {
+    e.preventDefault();
+
+    state.lastTouches = Array.from(e.touches).map(t => ({ clientX: t.clientX, clientY: t.clientY }));
+    if (e.touches.length < 2) {
+      state.lastDist = null;
+      state.lastMid = null;
+    }
   }, { passive: false });
 }
 window.expandMermaid = expandMermaid;

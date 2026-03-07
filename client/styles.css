@@ -822,10 +822,35 @@ body { touch-action: pan-y; }
 /* Mermaid expand */
 .canvas-mermaid-wrapper { position: relative; touch-action: pinch-zoom; }
 .canvas-mermaid-wrapper .chart-expand-btn { top: 8px; right: 8px; }
-.mermaid-overlay-inner {
+.mermaid-modal-box {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 10px;
+  width: calc(100vw - 24px);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-height: 90vh;
+  overflow: hidden;
+  position: relative;
 }
-.mermaid-overlay { touch-action: auto; }
+.mermaid-zoom-area {
+  flex: 1;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  min-height: 300px;
+  position: relative;
+}
+.mermaid-zoom-area svg {
+  transform-origin: 0 0;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mermaid-modal-hint {
+  text-align: center;
+  font-size: 0.65em;
+  color: #444;
+  padding: 6px;
+  border-top: 1px solid #1a1a1a;
+}
