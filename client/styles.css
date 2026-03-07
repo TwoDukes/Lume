@@ -827,5 +827,5 @@ body { touch-action: pan-y; }
   flex-direction: column;
   width: 100%;
   max-height: 90vh;
-  overflow: hidden;
 }
+.mermaid-overlay { touch-action: auto; }

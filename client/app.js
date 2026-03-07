@@ -598,15 +598,14 @@ function expandMermaid(id) {
   if (!svg) return;
 
   const cloned = svg.cloneNode(true);
-  // Force SVG wide enough to scroll — user pans around to read
-  cloned.style.minWidth = '900px';
-  cloned.style.width = '900px';
+  // Fit the whole diagram to the modal width — pinch-zoom from there
+  cloned.style.width = '100%';
   cloned.style.height = 'auto';
   cloned.removeAttribute('width');
   cloned.removeAttribute('height');
 
   const overlay = document.createElement('div');
-  overlay.className = 'chart-overlay';
+  overlay.className = 'chart-overlay mermaid-overlay';
 
   const inner = document.createElement('div');
   inner.className = 'chart-overlay-inner mermaid-overlay-inner';
@@ -616,17 +615,11 @@ function expandMermaid(id) {
   closeBtn.textContent = '✕';
   closeBtn.onclick = () => overlay.remove();
 
-  // Scrollable area — pan freely, no touch-action blocking
-  const scrollArea = document.createElement('div');
-  scrollArea.style.cssText = 'overflow:scroll;-webkit-overflow-scrolling:touch;width:100%;max-height:78vh;';
-  scrollArea.appendChild(cloned);
-
   inner.appendChild(closeBtn);
-  inner.appendChild(scrollArea);
+  inner.appendChild(cloned);
   overlay.appendChild(inner);
   document.body.appendChild(overlay);
 
-  // Only close if tapping the dark backdrop directly
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 window.expandMermaid = expandMermaid;
