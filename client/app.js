@@ -623,28 +623,43 @@ function expandMermaid(id) {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
-  // JS pinch-zoom via transform: scale()
-  let scale = 1, lastDist = 0;
+  // JS pinch-zoom + pan via transform
+  let scale = 1, tx = 0, ty = 0;
+  let lastDist = 0, lastX = 0, lastY = 0;
+
+  function applyTransform() {
+    cloned.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+
   inner.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
       lastDist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      e.preventDefault();
+    } else if (e.touches.length === 1) {
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
     }
+    e.preventDefault();
   }, { passive: false });
+
   inner.addEventListener('touchmove', e => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      scale = Math.min(Math.max(scale * (dist / lastDist), 0.5), 6);
+      scale = Math.min(Math.max(scale * (dist / lastDist), 0.3), 8);
       lastDist = dist;
-      cloned.style.transform = `scale(${scale})`;
-      e.preventDefault();
+    } else if (e.touches.length === 1) {
+      tx += e.touches[0].clientX - lastX;
+      ty += e.touches[0].clientY - lastY;
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
     }
+    applyTransform();
+    e.preventDefault();
   }, { passive: false });
 }
 window.expandMermaid = expandMermaid;
