@@ -404,7 +404,10 @@ function blockHTML(block) {
     case 'chart':
       const chartId = 'chart-' + Math.random().toString(36).slice(2, 8);
       return `<div class="canvas-block canvas-chart-block">
-        <canvas id="${chartId}" data-chart='${JSON.stringify(block.config || {})}'></canvas>
+        <div class="chart-wrapper">
+          <button class="chart-expand-btn" onclick="expandChart('${chartId}')" title="Fullscreen">⛶</button>
+          <canvas id="${chartId}" data-chart='${JSON.stringify(block.config || {})}'></canvas>
+        </div>
       </div>`;
 
     case 'image':
@@ -434,7 +437,10 @@ function blockHTML(block) {
 
     case 'mermaid':
       const mermaidId = 'mermaid-' + (mermaidCounter++);
-      return `<div class="canvas-block canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}"></div>`;
+      return `<div class="canvas-block canvas-mermaid-wrapper">
+        <div class="canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}"></div>
+        <button class="chart-expand-btn" onclick="expandMermaid('${mermaidId}')" title="Fullscreen">⛶</button>
+      </div>`;
 
     case 'collapsible':
       const innerBlocks = (block.blocks || []).map(blockHTML).join('');
@@ -470,6 +476,9 @@ function initCanvasBlocks(container) {
       el._chartInit = true;
       try {
         const config = JSON.parse(el.dataset.chart);
+        config.options = config.options || {};
+        config.options.responsive = true;
+        config.options.maintainAspectRatio = false;
         // Apply dark theme defaults
         if (config.options) {
           config.options.plugins = config.options.plugins || {};
@@ -549,7 +558,199 @@ function copyCode(id) {
     }
   });
 }
+
+function expandChart(chartId) {
+  const orig = document.getElementById(chartId);
+  if (!orig) return;
+  const config = JSON.parse(orig.dataset.chart || '{}');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay';
+  overlay.innerHTML = `<div class="chart-overlay-inner">
+    <button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button>
+    <canvas id="${chartId}-full"></canvas>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  if (typeof Chart !== 'undefined') {
+    const fullCanvas = overlay.querySelector('canvas');
+    // Apply same dark theme defaults as initCanvasBlocks
+    if (config.options) {
+      config.options.plugins = config.options.plugins || {};
+      config.options.plugins.legend = config.options.plugins.legend || {};
+      config.options.plugins.legend.labels = { color: '#888' };
+      config.options.scales = config.options.scales || {};
+      for (const axis of ['x', 'y']) {
+        config.options.scales[axis] = config.options.scales[axis] || {};
+        config.options.scales[axis].ticks = { color: '#555' };
+        config.options.scales[axis].grid = { color: '#1e1e1e' };
+      }
+    }
+    new Chart(fullCanvas, config);
+  }
+}
+
 window.copyCode = copyCode;
+window.expandChart = expandChart;
+
+function expandMermaid(id) {
+  const orig = document.getElementById(id);
+  if (!orig) return;
+  const svg = orig.querySelector('svg');
+  if (!svg) return;
+
+  const cloned = svg.cloneNode(true);
+  cloned.removeAttribute('width');
+  cloned.removeAttribute('height');
+  cloned.style.display = 'block';
+  cloned.style.width = '100%';
+  cloned.style.height = 'auto';
+  cloned.style.transformOrigin = '0 0';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-overlay mermaid-overlay';
+
+  const modalBox = document.createElement('div');
+  modalBox.className = 'mermaid-modal-box';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'chart-overlay-close';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = () => overlay.remove();
+
+  // Header row above zoomArea — no overlap with touch surface
+  const header = document.createElement('div');
+  header.className = 'mermaid-modal-header';
+  header.appendChild(closeBtn);
+
+  const zoomArea = document.createElement('div');
+  zoomArea.className = 'mermaid-zoom-area';
+  zoomArea.appendChild(cloned);
+
+  const hint = document.createElement('div');
+  hint.className = 'mermaid-modal-hint';
+  hint.textContent = '1 finger pan · 2 finger zoom · 2× tap reset';
+
+  modalBox.appendChild(header);
+  modalBox.appendChild(zoomArea);
+  modalBox.appendChild(hint);
+  overlay.appendChild(modalBox);
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+  modalBox.addEventListener('click', e => e.stopPropagation());
+
+  const state = {
+    scale: 1,
+    tx: 0,
+    ty: 0,
+    lastTouches: null,
+    lastDist: null,
+    lastMid: null,
+    lastTap: 0,
+  };
+
+  const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+  const getDist = (t1, t2) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  const getMid = (t1, t2) => ({
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2,
+  });
+
+  function applyTransform() {
+    cloned.style.transform = `translate(${state.tx}px,${state.ty}px) scale(${state.scale})`;
+  }
+
+  function resetView() {
+    state.scale = 1;
+    state.tx = 0;
+    state.ty = 0;
+    state.lastTouches = null;
+    state.lastDist = null;
+    state.lastMid = null;
+    applyTransform();
+  }
+
+  applyTransform();
+
+  zoomArea.addEventListener('touchstart', e => {
+    e.preventDefault();
+
+    const now = Date.now();
+    if (e.touches.length === 1) {
+      if (now - state.lastTap < 300) {
+        resetView();
+        state.lastTap = 0;
+        return;
+      }
+      state.lastTap = now;
+    }
+
+    state.lastTouches = Array.from(e.touches).map(t => ({ clientX: t.clientX, clientY: t.clientY }));
+
+    if (e.touches.length === 2) {
+      state.lastDist = getDist(e.touches[0], e.touches[1]);
+      state.lastMid = getMid(e.touches[0], e.touches[1]);
+    }
+  }, { passive: false });
+
+  zoomArea.addEventListener('touchmove', e => {
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const prev = state.lastTouches && state.lastTouches[0];
+      if (prev) {
+        state.tx += t.clientX - prev.clientX;
+        state.ty += t.clientY - prev.clientY;
+        applyTransform();
+      }
+      state.lastTouches = [{ clientX: t.clientX, clientY: t.clientY }];
+      state.lastDist = null;
+      state.lastMid = null;
+      return;
+    }
+
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = getDist(t1, t2);
+      const mid = getMid(t1, t2);
+
+      if (state.lastDist && state.lastDist > 0) {
+        const rawFactor = dist / state.lastDist;
+        const nextScale = clamp(state.scale * rawFactor, 0.5, 8);
+        const factor = nextScale / state.scale;
+
+        state.tx = mid.x - (mid.x - state.tx) * factor;
+        state.ty = mid.y - (mid.y - state.ty) * factor;
+        state.scale = nextScale;
+        applyTransform();
+      }
+
+      state.lastDist = dist;
+      state.lastMid = mid;
+      state.lastTouches = [
+        { clientX: t1.clientX, clientY: t1.clientY },
+        { clientX: t2.clientX, clientY: t2.clientY },
+      ];
+    }
+  }, { passive: false });
+
+  zoomArea.addEventListener('touchend', e => {
+    e.preventDefault();
+
+    state.lastTouches = Array.from(e.touches).map(t => ({ clientX: t.clientX, clientY: t.clientY }));
+    if (e.touches.length < 2) {
+      state.lastDist = null;
+      state.lastMid = null;
+    }
+  }, { passive: false });
+}
+window.expandMermaid = expandMermaid;
 
 // --- Markdown ---
 if (typeof marked !== 'undefined') {
