@@ -252,14 +252,31 @@ function renderActions() {
 }
 
 async function triggerAction(id, btn) {
-  if (btn) btn.classList.add('running');
+  let origHTML = '';
+  let runningTimeout = null;
+  if (btn) {
+    origHTML = btn.innerHTML;
+    btn.classList.add('running');
+    btn.innerHTML = '<div class="action-icon">⟳</div>Loading...';
+    runningTimeout = setTimeout(() => btn.classList.remove('running'), 1800000);
+  }
   try {
     const res = await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
     if (res && res.result) showActionResult({ id, result: res.result });
+    if (btn) {
+      btn.innerHTML = origHTML;
+      btn.classList.remove('running');
+      if (runningTimeout) clearTimeout(runningTimeout);
+    }
   } catch (e) {
     console.error('Action failed:', e);
+    if (btn) {
+      btn.innerHTML = '<div class="action-icon">✕</div>Error';
+      btn.style.borderColor = 'var(--red, #F44336)';
+      setTimeout(() => { btn.innerHTML = origHTML; btn.style.borderColor = ''; btn.classList.remove('running'); }, 2000);
+      if (runningTimeout) clearTimeout(runningTimeout);
+    }
   }
-  if (btn) setTimeout(() => btn.classList.remove('running'), 180000);
 }
 
 function showActionResult(data) {
@@ -292,7 +309,7 @@ function renderCanvas() {
   destroyCharts();
 
   if (!canvasData) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9634;</div>Nothing here yet</div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔵</div><div>Canvas is empty</div><div class="empty-state-sub">Your AI will write here</div></div>';
     return;
   }
 
