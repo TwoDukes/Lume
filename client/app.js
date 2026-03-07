@@ -2,6 +2,8 @@
 const $ = id => document.getElementById(id);
 let ws = null;
 let reconnectTimer = null;
+let activeToast = null;
+let activeToastTimer = null;
 
 // --- State ---
 let feedCards = [];
@@ -846,6 +848,115 @@ setInterval(() => {
     }, 400);
   }
 }, 30000);
+
+function dismissToast() {
+  if (!activeToast) return;
+  const toast = activeToast;
+  activeToast = null;
+  if (activeToastTimer) {
+    clearTimeout(activeToastTimer);
+    activeToastTimer = null;
+  }
+  toast.classList.remove('show');
+  setTimeout(() => {
+    if (toast.parentNode) toast.remove();
+  }, 220);
+}
+
+function showToast(message, type = 'success', durationMs = 6000) {
+  dismissToast();
+
+  const toast = document.createElement('div');
+  toast.className = `lume-toast ${type === 'error' ? 'error' : 'success'}`;
+
+  if (typeof message === 'string') {
+    const body = document.createElement('div');
+    body.className = 'lume-toast-body';
+
+    const msg = document.createElement('div');
+    msg.className = 'lume-toast-message';
+    msg.textContent = message;
+
+    body.appendChild(msg);
+    toast.appendChild(body);
+  } else if (message instanceof HTMLElement) {
+    toast.appendChild(message);
+  }
+
+  document.body.appendChild(toast);
+  activeToast = toast;
+
+  requestAnimationFrame(() => {
+    if (activeToast === toast) toast.classList.add('show');
+  });
+
+  if (durationMs > 0) {
+    activeToastTimer = setTimeout(() => {
+      if (activeToast === toast) dismissToast();
+    }, durationMs);
+  }
+
+  return toast;
+}
+
+async function shareCanvas() {
+  const rawName = window.prompt('Name this canvas:', 'my-canvas');
+  if (rawName === null) return;
+
+  const name = rawName.trim();
+  if (!name) return;
+
+  const shareBtn = $('share-btn');
+  if (shareBtn) shareBtn.disabled = true;
+
+  try {
+    const result = await apiFetch('/api/canvas/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    const sharePath = result?.shareUrl;
+    if (!sharePath) throw new Error('Missing share URL');
+
+    const fullUrl = window.location.origin + sharePath;
+
+    const body = document.createElement('div');
+    body.className = 'lume-toast-body';
+
+    const msg = document.createElement('div');
+    msg.className = 'lume-toast-message';
+    msg.textContent = fullUrl;
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'lume-toast-copy';
+    copyBtn.textContent = 'Copy';
+    copyBtn.type = 'button';
+
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+        }, 1400);
+      } catch (err) {
+        copyBtn.textContent = 'Copy failed';
+      }
+    });
+
+    body.appendChild(msg);
+    body.appendChild(copyBtn);
+    showToast(body, 'success', 6000);
+  } catch (e) {
+    console.error('Snapshot save failed:', e);
+    showToast('Failed to save snapshot', 'error', 2200);
+  } finally {
+    if (shareBtn) shareBtn.disabled = false;
+  }
+}
+window.shareCanvas = shareCanvas;
 
 // --- Panel collapse ---
 function togglePanel(name) {

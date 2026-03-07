@@ -57,7 +57,10 @@
     <div class="panel panel-canvas">
       <div class="panel-header">
         <span>Canvas</span>
-        <button id="reset-btn" onclick="event.stopPropagation(); resetDashboard()" title="Reset dashboard">🗑 Reset</button>
+        <div class="canvas-header-actions">
+          <button id="share-btn" onclick="event.stopPropagation(); shareCanvas()" title="Create share link">🔗 Share</button>
+          <button id="reset-btn" onclick="event.stopPropagation(); resetDashboard()" title="Reset dashboard">🗑 Reset</button>
+        </div>
       </div>
       <div class="panel-body">
         <div class="canvas-content" id="canvas-content">
