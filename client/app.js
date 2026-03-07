@@ -571,6 +571,9 @@ function renderMarkdown(md) {
 
 // --- API helper ---
 async function apiFetch(path, opts = {}) {
+  const cfg = window.CYAN_CONFIG || {};
+  opts.headers = opts.headers || {};
+  if (cfg.token) opts.headers['Authorization'] = `Bearer ${cfg.token}`;
   const res = await fetch(path, opts);
   if (!res.ok) throw new Error(`API ${res.status}`);
   const ct = res.headers.get('content-type');
