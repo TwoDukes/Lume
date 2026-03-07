@@ -596,13 +596,34 @@ function expandMermaid(id) {
   if (!orig) return;
   const svg = orig.querySelector('svg');
   if (!svg) return;
+
+  const cloned = svg.cloneNode(true);
+  cloned.style.width = 'max(100%, 700px)';
+  cloned.style.height = 'auto';
+  cloned.removeAttribute('width');
+  cloned.removeAttribute('height');
+
   const overlay = document.createElement('div');
   overlay.className = 'chart-overlay';
-  overlay.innerHTML = `<div class="chart-overlay-inner mermaid-overlay-inner">
-    <button class="chart-overlay-close" onclick="this.closest('.chart-overlay').remove()">✕</button>
-    ${svg.outerHTML}
-  </div>`;
+  overlay.style.touchAction = 'none';
+
+  const inner = document.createElement('div');
+  inner.className = 'chart-overlay-inner mermaid-overlay-inner';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'chart-overlay-close';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = () => overlay.remove();
+
+  const scrollArea = document.createElement('div');
+  scrollArea.style.cssText = 'overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;width:100%;max-height:80vh;';
+  scrollArea.appendChild(cloned);
+
+  inner.appendChild(closeBtn);
+  inner.appendChild(scrollArea);
+  overlay.appendChild(inner);
   document.body.appendChild(overlay);
+
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 window.expandMermaid = expandMermaid;
