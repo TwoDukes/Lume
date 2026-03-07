@@ -936,11 +936,16 @@ async function shareCanvas() {
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       try {
-        await navigator.clipboard.writeText(fullUrl);
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(fullUrl);
+        } else {
+          const tmp = document.createElement('input');
+          tmp.value = fullUrl; document.body.appendChild(tmp);
+          tmp.select(); document.execCommand('copy');
+          document.body.removeChild(tmp);
+        }
         copyBtn.textContent = 'Copied!';
-        setTimeout(() => {
-          copyBtn.textContent = 'Copy';
-        }, 1400);
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1400);
       } catch (err) {
         copyBtn.textContent = 'Copy failed';
       }
