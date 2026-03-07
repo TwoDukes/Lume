@@ -554,10 +554,13 @@ body {
   padding: 10px;
   position: relative;
 }
+.canvas-chart-block .chart-wrapper {
+  height: 320px;
+  position: relative;
+}
 .canvas-chart-block canvas {
   width: 100% !important;
-  height: 320px !important;
-  max-height: none;
+  height: 100% !important;
 }
 
 /* Chart expand button */

@@ -476,6 +476,9 @@ function initCanvasBlocks(container) {
       el._chartInit = true;
       try {
         const config = JSON.parse(el.dataset.chart);
+        config.options = config.options || {};
+        config.options.responsive = true;
+        config.options.maintainAspectRatio = false;
         // Apply dark theme defaults
         if (config.options) {
           config.options.plugins = config.options.plugins || {};
