@@ -437,7 +437,8 @@ function blockHTML(block) {
 
     case 'mermaid':
       const mermaidId = 'mermaid-' + (mermaidCounter++);
-      return `<div class="canvas-block canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}">
+      return `<div class="canvas-block canvas-mermaid-wrapper">
+        <div class="canvas-mermaid-block" id="${mermaidId}" data-mermaid="${escAttr(block.content || '')}"></div>
         <button class="chart-expand-btn" onclick="expandMermaid('${mermaidId}')" title="Fullscreen">⛶</button>
       </div>`;
 

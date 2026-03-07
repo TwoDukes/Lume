@@ -819,5 +819,6 @@ body { touch-action: pan-y; }
 .canvas-chart-block { touch-action: pinch-zoom; }
 
 /* Mermaid expand */
-.canvas-mermaid-block { position: relative; touch-action: pinch-zoom; }
+.canvas-mermaid-wrapper { position: relative; touch-action: pinch-zoom; }
+.canvas-mermaid-wrapper .chart-expand-btn { top: 8px; right: 8px; }
 .mermaid-overlay-inner svg { width: 100%; height: auto; max-height: 80vh; }
