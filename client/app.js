@@ -637,6 +637,31 @@ function togglePanel(name) {
 }
 window.togglePanel = togglePanel;
 
+async function resetDashboard() {
+  const btn = $('reset-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await apiFetch('/api/canvas', { method: 'DELETE' }).catch(() => null);
+
+    const cards = [...feedCards];
+    await Promise.all(cards
+      .filter(card => card && card.id)
+      .map(card => apiFetch(`/api/feed/${encodeURIComponent(card.id)}`, { method: 'DELETE' }).catch(() => null))
+    );
+
+    canvasData = null;
+    feedCards = [];
+    renderCanvas();
+    renderFeed();
+  } catch (e) {
+    console.error('Reset failed:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.resetDashboard = resetDashboard;
+
+
 // --- Boot ---
 loadInitial();
 connectWS();

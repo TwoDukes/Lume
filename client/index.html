@@ -55,7 +55,10 @@
 
     <!-- CANVAS / LAB (bottom-right, larger) -->
     <div class="panel panel-canvas">
-      <div class="panel-header">Canvas</div>
+      <div class="panel-header">
+        <span>Canvas</span>
+        <button id="reset-btn" onclick="event.stopPropagation(); resetDashboard()" title="Reset dashboard">🗑 Reset</button>
+      </div>
       <div class="panel-body">
         <div class="canvas-content" id="canvas-content">
           <div class="empty-state">

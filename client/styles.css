@@ -710,6 +710,33 @@ body {
   margin-top: 4px;
 }
 
+
+
+#reset-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--text-dimmer);
+  font-size: 0.72em;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s, opacity 0.2s;
+}
+
+#reset-btn:hover {
+  color: var(--text-dim);
+  border-color: #333;
+  background: #111;
+}
+
+#reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Narrow screens — stack vertically */
 @media (max-width: 500px) {
   .grid {
