@@ -1,6 +1,4 @@
 
-
-
 const $ = id => document.getElementById(id);
 let ws = null;
 let reconnectTimer = null;
@@ -155,6 +153,13 @@ function handleMessage(msg) {
 
 // --- Feed ---
 function renderFeed() {
+  // Expire TTL cards
+  const now = Date.now();
+  feedCards = feedCards.filter(c => {
+    if (!c.ttl || !c.timestamp) return true;
+    return now - new Date(c.timestamp).getTime() < c.ttl * 1000;
+  });
+
   const container = $('feed-cards');
   const count = $('feed-count');
   if (!feedCards.length) {
@@ -164,23 +169,61 @@ function renderFeed() {
   }
   count.textContent = feedCards.length;
   container.innerHTML = feedCards.map(cardHTML).join('');
+
+  // Schedule TTL removals
+  feedCards.forEach(c => {
+    if (!c.ttl || !c.timestamp) return;
+    const remaining = (c.ttl * 1000) - (now - new Date(c.timestamp).getTime());
+    if (remaining > 0) {
+      setTimeout(() => {
+        const el = document.querySelector(`.feed-card[data-id="${c.id}"]`);
+        if (el) el.classList.add('expiring');
+        setTimeout(() => {
+          feedCards = feedCards.filter(fc => fc.id !== c.id);
+          renderFeed();
+        }, 400);
+      }, remaining);
+    }
+  });
 }
 
 function cardHTML(card) {
   const time = card.timestamp ? timeAgo(new Date(card.timestamp)) : '';
   const icon = card.icon || '';
-  const cls = card.priority === 'high' ? ' high' : '';
+  const typeCls = card.type ? ` card-${card.type}` : '';
+  const highCls = card.priority === 'high' ? ' high' : '';
+  const linkCls = card.link ? ' has-link' : '';
   const tsAttr = card.timestamp ? ` data-ts="${escAttr(card.timestamp)}"` : '';
+
   let actionBtn = '';
   if (card.action) {
-    actionBtn = `<div class="feed-card-action"><button onclick="triggerCardAction('${escAttr(card.action.endpoint)}')">${esc(card.action.label)}</button></div>`;
+    actionBtn = `<div class="feed-card-action"><button onclick="event.stopPropagation();triggerCardAction('${escAttr(card.action.endpoint)}')">${esc(card.action.label)}</button></div>`;
   }
-  return `<div class="feed-card${cls}" data-id="${escAttr(card.id || '')}">
+
+  let image = '';
+  if (card.image) {
+    const longBody = (card.body || '').length > 80;
+    image = longBody
+      ? `<div class="feed-card-img full"><img src="${escAttr(card.image)}" loading="lazy" alt=""></div>`
+      : `<img class="feed-card-thumb" src="${escAttr(card.image)}" loading="lazy" alt="">`;
+  }
+
+  const linkIcon = card.link ? '<span class="feed-card-link-icon">&#8599;</span>' : '';
+  const onclick = card.link ? ` onclick="window.open('${escAttr(card.link)}','_blank')"` : '';
+
+  const thumbInline = (card.image && (card.body || '').length <= 80) ? image : '';
+  const imgBelow = (card.image && (card.body || '').length > 80) ? image : '';
+
+  return `<div class="feed-card${typeCls}${highCls}${linkCls}" data-id="${escAttr(card.id || '')}"${onclick}>
     <div class="feed-card-top">
       <div class="feed-card-title">${icon} ${esc(card.title || '')}</div>
-      <div class="feed-card-time"${tsAttr}>${time}</div>
+      <div class="feed-card-top-right">${linkIcon}<span class="feed-card-time"${tsAttr}>${time}</span></div>
     </div>
-    <div class="feed-card-body">${esc(card.body || '')}</div>
+    <div class="feed-card-content">
+      <div class="feed-card-body">${esc(card.body || '')}</div>
+      ${thumbInline}
+    </div>
+    ${imgBelow}
     ${actionBtn}
   </div>`;
 }
@@ -535,11 +578,25 @@ function timeAgo(date) {
   return Math.floor(s / 86400) + 'd ago';
 }
 
-// --- Live timestamp refresh ---
+// --- Live timestamp refresh + TTL check ---
 setInterval(() => {
   document.querySelectorAll('.feed-card-time[data-ts]').forEach(el => {
     el.textContent = timeAgo(new Date(el.dataset.ts));
   });
+  // Re-check TTLs
+  const now = Date.now();
+  const expired = feedCards.filter(c => c.ttl && c.timestamp &&
+    now - new Date(c.timestamp).getTime() >= c.ttl * 1000);
+  if (expired.length) {
+    expired.forEach(c => {
+      const el = document.querySelector(`.feed-card[data-id="${c.id}"]`);
+      if (el) el.classList.add('expiring');
+    });
+    setTimeout(() => {
+      feedCards = feedCards.filter(c => !expired.includes(c));
+      renderFeed();
+    }, 400);
+  }
 }, 30000);
 
 // --- Panel collapse ---
