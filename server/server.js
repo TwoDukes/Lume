@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createServer, request as httpRequest } from "http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { join, extname, dirname } from "path";
@@ -9,11 +10,33 @@ const PORT        = parseInt(process.env.PORT || "7777");
 const TOKEN       = process.env.LUME_TOKEN;
 const GW_URL      = process.env.OPENCLAW_GATEWAY_URL || "http://127.0.0.1:18789";
 const GW_TOKEN    = process.env.OPENCLAW_GATEWAY_TOKEN;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
 if (!TOKEN) {
   console.error("ERROR: LUME_TOKEN is required");
   process.exit(1);
 }
+
+// ─── Rate limiter ─────────────────────────────────────────────────────────────
+const rateLimits = new Map();
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const window = 60_000;
+  const max = 60;
+  let entry = rateLimits.get(ip);
+  if (!entry || now - entry.start > window) {
+    entry = { start: now, count: 0 };
+    rateLimits.set(ip, entry);
+  }
+  entry.count++;
+  return entry.count <= max;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimits) {
+    if (now - entry.start > 60_000) rateLimits.delete(ip);
+  }
+}, 300_000);
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIR  = join(__dir, "../client");
@@ -32,7 +55,13 @@ function saveState(name, data) {
 }
 
 let feed    = loadState("feed", []);
-let actions = loadState("actions", []);
+const DEFAULT_ACTIONS = [
+  { id: "weather",       label: "🌤️ Weather",       color: "#00BCD4" },
+  { id: "hn-top5",       label: "📰 HN Top 5",       color: "#FF6D00" },
+  { id: "server-status", label: "🖥️ Server Status",  color: "#4CAF50" },
+  { id: "surprise",      label: "✨ Surprise",        color: "#9C27B0" },
+];
+let actions = loadState("actions", DEFAULT_ACTIONS);
 let canvas  = loadState("canvas", null);
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
@@ -91,7 +120,7 @@ function readBody(req) {
 function json(res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": CORS_ORIGIN,
   });
   res.end(JSON.stringify(data));
 }
@@ -150,7 +179,7 @@ const server = createServer(async (req, res) => {
 
   // CORS preflight
   if (req.method === "OPTIONS") {
-    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE", "Access-Control-Allow-Headers": "Content-Type,Authorization" });
+    res.writeHead(204, { "Access-Control-Allow-Origin": CORS_ORIGIN, "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE", "Access-Control-Allow-Headers": "Content-Type,Authorization" });
     return res.end();
   }
 
@@ -158,12 +187,16 @@ const server = createServer(async (req, res) => {
   if (path.startsWith("/api/")) {
     if (!isAuthed(req)) return json(res, 401, { error: "Unauthorized" });
 
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(clientIp)) return json(res, 429, { error: 'Rate limit exceeded' });
+
     const body = await readBody(req);
     const bodyJson = body.length ? (() => { try { return JSON.parse(body); } catch { return {}; } })() : {};
 
     // Feed
     if (path === "/api/feed" && req.method === "GET") return json(res, 200, feed);
     if (path === "/api/feed" && req.method === "POST") {
+      if (!bodyJson.title || typeof bodyJson.title !== 'string') return json(res, 400, { error: 'title is required' });
       const card = { ...bodyJson, timestamp: bodyJson.timestamp || new Date().toISOString() };
       const idx = card.id ? feed.findIndex(c => c.id === card.id) : -1;
       if (idx >= 0) feed[idx] = card; else feed.unshift(card);
@@ -209,6 +242,7 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     if (path === "/api/canvas/block" && req.method === "POST") {
+      if (!bodyJson.type || typeof bodyJson.type !== 'string') return json(res, 400, { error: 'type is required' });
       if (!canvas || canvas.type !== "blocks") canvas = { type: "blocks", blocks: [] };
       if (bodyJson.type === "blocks" && Array.isArray(bodyJson.blocks)) {
         canvas.blocks.push(...bodyJson.blocks);
@@ -264,7 +298,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log("\n  🔵 Cyan Dashboard");
+  console.log("\n  🔵 Lume");
   console.log(`  http://localhost:${PORT}`);
   console.log(`  Gateway: ${GW_URL}`);
   console.log();

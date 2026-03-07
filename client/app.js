@@ -126,10 +126,24 @@ function handleMessage(msg) {
     case 'canvas':
       canvasData = data;
       renderCanvas();
+      // Restore any running action button
+      document.querySelectorAll('.action-btn.running').forEach(btn => {
+        const origHTML = btn.dataset.origHtml;
+        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+        btn.classList.remove('running');
+        btn.style.borderColor = '';
+      });
       break;
 
     case 'canvas_append':
       appendCanvas(data);
+      // Restore any running action button
+      document.querySelectorAll('.action-btn.running').forEach(btn => {
+        const origHTML = btn.dataset.origHtml;
+        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+        btn.classList.remove('running');
+        btn.style.borderColor = '';
+      });
       break;
 
     case 'canvas_clear':
@@ -252,14 +266,35 @@ function renderActions() {
 }
 
 async function triggerAction(id, btn) {
-  if (btn) btn.classList.add('running');
+  let runningTimeout = null;
+  if (btn) {
+    btn.dataset.origHtml = btn.innerHTML;
+    btn.classList.add('running');
+    btn.innerHTML = '<div class="action-icon"><span class="btn-spinner"></span></div>';
+    runningTimeout = setTimeout(() => {
+      const origHTML = btn.dataset.origHtml;
+      if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
+      btn.classList.remove('running');
+      btn.style.borderColor = '';
+    }, 1800000);
+  }
   try {
-    const res = await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
-    if (res && res.result) showActionResult({ id, result: res.result });
+    await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
   } catch (e) {
     console.error('Action failed:', e);
+    if (btn) {
+      const origHTML = btn.dataset.origHtml || '';
+      btn.innerHTML = '<div class="action-icon">✕</div>Error';
+      btn.style.borderColor = 'var(--red, #F44336)';
+      setTimeout(() => {
+        if (origHTML) btn.innerHTML = origHTML;
+        delete btn.dataset.origHtml;
+        btn.style.borderColor = '';
+        btn.classList.remove('running');
+      }, 2000);
+      if (runningTimeout) clearTimeout(runningTimeout);
+    }
   }
-  if (btn) setTimeout(() => btn.classList.remove('running'), 180000);
 }
 
 function showActionResult(data) {
@@ -292,7 +327,7 @@ function renderCanvas() {
   destroyCharts();
 
   if (!canvasData) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9634;</div>Nothing here yet</div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔵</div><div>Canvas is empty</div><div class="empty-state-sub">Your AI will write here</div></div>';
     return;
   }
 
@@ -536,6 +571,9 @@ function renderMarkdown(md) {
 
 // --- API helper ---
 async function apiFetch(path, opts = {}) {
+  const cfg = window.CYAN_CONFIG || {};
+  opts.headers = opts.headers || {};
+  if (cfg.token) opts.headers['Authorization'] = `Bearer ${cfg.token}`;
   const res = await fetch(path, opts);
   if (!res.ok) throw new Error(`API ${res.status}`);
   const ct = res.headers.get('content-type');
@@ -619,6 +657,31 @@ function togglePanel(name) {
   }
 }
 window.togglePanel = togglePanel;
+
+async function resetDashboard() {
+  const btn = $('reset-btn');
+  if (btn) btn.disabled = true;
+  try {
+    await apiFetch('/api/canvas', { method: 'DELETE' }).catch(() => null);
+
+    const cards = [...feedCards];
+    await Promise.all(cards
+      .filter(card => card && card.id)
+      .map(card => apiFetch(`/api/feed/${encodeURIComponent(card.id)}`, { method: 'DELETE' }).catch(() => null))
+    );
+
+    canvasData = null;
+    feedCards = [];
+    renderCanvas();
+    renderFeed();
+  } catch (e) {
+    console.error('Reset failed:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.resetDashboard = resetDashboard;
+
 
 // --- Boot ---
 loadInitial();
