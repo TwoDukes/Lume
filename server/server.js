@@ -55,7 +55,13 @@ function saveState(name, data) {
 }
 
 let feed    = loadState("feed", []);
-let actions = loadState("actions", []);
+const DEFAULT_ACTIONS = [
+  { id: "weather",       label: "🌤️ Weather",       color: "#00BCD4" },
+  { id: "hn-top5",       label: "📰 HN Top 5",       color: "#FF6D00" },
+  { id: "server-status", label: "🖥️ Server Status",  color: "#4CAF50" },
+  { id: "surprise",      label: "✨ Surprise",        color: "#9C27B0" },
+];
+let actions = loadState("actions", DEFAULT_ACTIONS);
 let canvas  = loadState("canvas", null);
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
