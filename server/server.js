@@ -6,12 +6,12 @@ import { WebSocketServer } from "ws";
 
 // ─── Config (from environment) ────────────────────────────────────────────────
 const PORT        = parseInt(process.env.PORT || "7777");
-const TOKEN       = process.env.CYAN_DASH_TOKEN;
+const TOKEN       = process.env.LUME_TOKEN;
 const GW_URL      = process.env.OPENCLAW_GATEWAY_URL || "http://127.0.0.1:18789";
 const GW_TOKEN    = process.env.OPENCLAW_GATEWAY_TOKEN;
 
 if (!TOKEN) {
-  console.error("ERROR: CYAN_DASH_TOKEN is required");
+  console.error("ERROR: LUME_TOKEN is required");
   process.exit(1);
 }
 

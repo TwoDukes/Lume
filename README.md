@@ -51,7 +51,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-CYAN_DASH_TOKEN=your-secret-token-here
+LUME_TOKEN=your-secret-token-here
 
 # Optional: OpenClaw gateway for action button handlers
 OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
