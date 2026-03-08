@@ -513,8 +513,9 @@ const server = createServer(async (req, res) => {
 
   // ── /config.js — exposes public config to client ──
   if (path === "/config.js") {
-    const wsProto = "ws";
-    const wsHost  = req.headers.host || `localhost:${PORT}`;
+    const isHttps = req.headers["x-forwarded-proto"] === "https";
+    const wsProto = isHttps ? "wss" : "ws";
+    const wsHost  = req.headers["x-forwarded-host"] || req.headers.host || `localhost:${PORT}`;
     res.writeHead(200, { "Content-Type": "application/javascript", "Cache-Control": "no-cache" });
     return res.end(`window.CYAN_CONFIG = { wsUrl: "${wsProto}://${wsHost}/ws", token: "" };`);
   }
