@@ -12,9 +12,9 @@ Three panels. One WebSocket. Your AI at the controls.
 
 Lume is a lightweight Node.js server + vanilla JS frontend that exposes a REST API and WebSocket for an AI agent to push content in real time:
 
-- **Feed** — live cards (news, alerts, status updates, anything)
+- **History** — a canvas snapshot browser. Load previous canvases, share them, pin or delete. Your working history, always accessible.
 - **Actions** — buttons the user can press to trigger AI tasks
-- **Canvas** — a rich, composable surface: markdown, charts, code, math, diagrams, images, audio players, interactive iframes
+- **Canvas** — a rich, composable surface: markdown, charts, code, math, diagrams, images, interactive iframes
 
 The key idea: **the AI writes to the dashboard, not the user.** Your agent decides what appears, streams it in block by block, and updates it as things change.
 
@@ -67,24 +67,31 @@ OPENCLAW_GATEWAY_TOKEN=your-gateway-token
 npm start
 ```
 
-Open `http://localhost:7777` in your browser. You'll be prompted to log in with your `LUME_PASSWORD`. Your session persists via localStorage — you won't need to log in again unless you clear storage or restart without a password set.
+Open `http://localhost:7777` in your browser. Log in with your `LUME_PASSWORD`. Your session persists via a signed cookie — you won't need to log in again on restarts.
 
 ### 4. Connect your AI
 
 Your agent pushes content via the REST API. No SDK needed — it's just HTTP.
 
 ```bash
-# Push a feed card
-curl -X POST http://localhost:7777/api/feed \
+# Push a canvas with identity (auto-saves to History)
+curl -X PUT http://localhost:7777/api/canvas \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
-  -d '{"id":"hello","title":"Hello from your AI","body":"Lume is live."}'
+  -H "X-Canvas-Slug: my-research" \
+  -d '{"type":"blocks","blocks":[{"type":"markdown","content":"# My Research"}]}'
 
-# Push a canvas block
+# Append a block progressively
 curl -X POST http://localhost:7777/api/canvas/block \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
-  -d '{"type":"markdown","content":"# Hello World\n\nYour AI wrote this."}'
+  -d '{"type":"markdown","content":"More content..."}'
+
+# Push a toast notification
+curl -X POST http://localhost:7777/api/toast \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"hello","icon":"🔵","title":"Hello","body":"Lume is live."}'
 ```
 
 ---
@@ -102,7 +109,7 @@ curl -X POST http://localhost:7777/api/canvas/block \
                                   ┌─────────────────────┐     ┌─────────────────────────┐
                                   │  Browser / Phone     │     │   Public Share Page      │
                                   │  (password login)    │     │   /share/:slug           │
-                                  │  Feed │ Actions │    │     │   (no auth, read-only)   │
+                                  │  History│Actions│    │     │   (no auth, read-only)   │
                                   │       Canvas         │     └─────────────────────────┘
                                   └─────────────────────┘
 ```
@@ -115,25 +122,93 @@ Lume is **model-agnostic**. Any agent that can make HTTP requests can drive it.
 
 All endpoints require `Authorization: Bearer <token>` (or `?token=<token>` in the query string).
 
-### Feed
+### Canvas
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/feed` | Get all feed cards |
-| `POST` | `/api/feed` | Push or upsert a card (matched by `id`) |
-| `DELETE` | `/api/feed/:id` | Remove a card |
+| `GET` | `/api/canvas` | Get current canvas state |
+| `PUT` | `/api/canvas` | Replace entire canvas (pass `X-Canvas-Slug` to auto-save to History) |
+| `POST` | `/api/canvas/block` | Append a block (progressive rendering) |
+| `DELETE` | `/api/canvas` | Clear canvas |
+| `GET` | `/api/canvas/slug` | Get current canvas slug |
+| `DELETE` | `/api/canvas/slug` | Clear current canvas slug |
 
-**Card schema:**
+#### Canvas Identity (auto-save to History)
+
+Pass `X-Canvas-Slug: your-slug` on any `PUT /api/canvas` to automatically save the canvas to History:
+
+```bash
+curl -X PUT http://localhost:7777/api/canvas \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -H "X-Canvas-Slug: weekly-report" \
+  -d '{"type":"blocks","blocks":[...]}'
+```
+
+- Creates or updates the History entry for that slug
+- **Private by default** — share links don't work until explicitly made public
+- **14-day TTL by default**, reset automatically when content changes
+- Ordering in History is stable — sorted by creation time, not last edit
+
+### History (Snapshots)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/canvas/snapshots` | List all snapshots (name, slug, savedAt, expiresAt, private) |
+| `GET` | `/api/canvas/snapshots/:slug` | Get full snapshot JSON including canvas |
+| `DELETE` | `/api/canvas/snapshots/:slug` | Delete a snapshot |
+| `POST` | `/api/canvas/snapshot` | Manually save a named snapshot |
+| `POST` | `/api/canvas/snapshots/:slug/pin` | Pin forever (removes TTL) |
+| `POST` | `/api/canvas/snapshots/:slug/privacy` | Toggle public/private |
+
+**Manual snapshot:**
+```bash
+curl -X POST http://localhost:7777/api/canvas/snapshot \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-report","ttlDays":7}'
+```
+
+Returns `{ "ok": true, "slug": "my-report", "shareUrl": "/share/my-report", "expiresAt": "..." }`.
+
+### Sharing
+
+Snapshots are **private by default**. To share, toggle public via the UI (Share button) or API:
+
+```bash
+# Make public
+curl -X POST http://localhost:7777/api/canvas/snapshots/my-report/privacy \
+  -H "Authorization: Bearer your-token"
+# Returns { "ok": true, "private": false }
+
+# Now accessible at: http://localhost:7777/share/my-report
+```
+
+Share pages have no auth, no token in the page source. Safe to send to anyone. TTL is respected — expired links return a 410. Private snapshots return a 404.
+
+### Toasts
+
+Ephemeral notification cards. They appear bottom-right, auto-dismiss, and include a draining progress bar for their TTL. Not persisted — fire and forget.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/toast` | Get current toasts |
+| `POST` | `/api/toast` | Push a toast |
+| `DELETE` | `/api/toast/:id` | Remove a toast |
+
+**Toast schema:**
 ```json
 {
   "id": "unique-id",
-  "title": "Card Title",
-  "body": "Card body text",
-  "icon": "🌤️",
-  "priority": "high",
-  "timestamp": "2026-03-06T22:00:00Z"
+  "title": "Toast Title",
+  "body": "Body text",
+  "icon": "🔵",
+  "type": "success",
+  "ttl": 8
 }
 ```
+
+`type` can be `success`, `warning`, or `alert` (affects left border color). `ttl` is in seconds (default 8).
 
 ### Actions
 
@@ -150,42 +225,6 @@ All endpoints require `Authorization: Bearer <token>` (or `?token=<token>` in th
   { "id": "news",    "label": "📰 Top News" }
 ]
 ```
-
-### Canvas
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/canvas` | Get current canvas state |
-| `PUT` | `/api/canvas` | Replace entire canvas |
-| `POST` | `/api/canvas/block` | Append a block (progressive) |
-| `DELETE` | `/api/canvas` | Clear canvas |
-| `POST` | `/api/canvas/snapshot` | Save a named snapshot of the current canvas |
-| `GET` | `/api/canvas/snapshots` | List all saved snapshots |
-| `DELETE` | `/api/canvas/snapshots/:slug` | Delete a snapshot |
-
-**Snapshot schema:**
-```json
-{ "name": "my-research" }
-```
-Returns `{ "ok": true, "slug": "my-research", "shareUrl": "/share/my-research" }`.
-
-### Sharing
-
-Snapshots are point-in-time copies of the canvas. Each gets a public URL at `/share/:slug` — no auth required, no token in the page source. Safe to share with anyone.
-
-```bash
-# Save a snapshot
-curl -X POST http://localhost:7777/api/canvas/snapshot \
-  -H "Authorization: Bearer your-token" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"weekly-report"}'
-
-# Share: http://localhost:7777/share/weekly-report
-```
-
-You can also hit the **🔗 Share** button in the canvas header — it auto-names from the first heading and shows a copyable link.
-
-To update a share link, just snapshot again with the same name. It overwrites.
 
 ---
 
@@ -331,13 +370,13 @@ Markdown blocks render HTML, which means you can embed styled buttons:
 
 ## Auth
 
-The dashboard is protected by a password login page. The `LUME_TOKEN` (used by your AI agent) is separate from the browser login and never exposed in the frontend.
+The dashboard is protected by a password login page. The `LUME_TOKEN` (used by your AI agent) is separate from the browser login and never exposed in the frontend. Sessions are HMAC-signed cookies — they survive server restarts without re-login.
 
 | Surface | Auth method |
 |---------|-------------|
-| Browser dashboard | `LUME_PASSWORD` → session cookie + localStorage |
+| Browser dashboard | `LUME_PASSWORD` → signed session cookie |
 | AI agent API calls | `Authorization: Bearer LUME_TOKEN` header |
-| Share pages (`/share/*`) | None — public read-only |
+| Share pages (`/share/*`) | None — public read-only (unless marked private) |
 
 If `LUME_PASSWORD` is not set, a random password is generated and printed to the server log on startup.
 
