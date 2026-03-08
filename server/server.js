@@ -105,7 +105,7 @@ function saveState(name, data) {
   writeFileSync(stateFile(name), JSON.stringify(data, null, 2));
 }
 
-let toasts  = loadState("toasts", []);
+let toasts  = []; // ephemeral — never persisted
 const DEFAULT_ACTIONS = [
   { id: "weather",       label: "🌤️ Weather",       color: "#00BCD4" },
   { id: "hn-top5",       label: "📰 HN Top 5",       color: "#FF6D00" },
@@ -129,7 +129,7 @@ function broadcast(msg) {
 
 wss.on("connection", (ws) => {
   clients.add(ws);
-  ws.send(JSON.stringify({ type: "init", data: { toasts, actions, canvas, slug: currentSlug } }));
+  ws.send(JSON.stringify({ type: "init", data: { actions, canvas, slug: currentSlug } }));
   ws.on("close", () => clients.delete(ws));
   ws.on("error", () => clients.delete(ws));
 });
@@ -357,14 +357,12 @@ const server = createServer(async (req, res) => {
       const card = { ...bodyJson, timestamp: bodyJson.timestamp || new Date().toISOString() };
       const idx = card.id ? toasts.findIndex(c => c.id === card.id) : -1;
       if (idx >= 0) toasts[idx] = card; else toasts.unshift(card);
-      saveState("toasts", toasts);
       broadcast({ type: "toast_update", data: card });
       return json(res, 200, { ok: true });
     }
     if (path.startsWith("/api/toast/") && req.method === "DELETE") {
       const id = decodeURIComponent(path.slice(11));
       toasts = toasts.filter(c => c.id !== id);
-      saveState("toasts", toasts);
       broadcast({ type: "toast_remove", data: { id } });
       return json(res, 200, { ok: true });
     }

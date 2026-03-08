@@ -346,17 +346,27 @@ function showToastCard(toast) {
   const el = document.createElement('div');
   el.className = `lume-toast-card${typeCls}`;
   el.dataset.id = id;
+  const ttlMs = (toast.ttl ? toast.ttl * 1000 : null) || 8000;
+
   el.innerHTML = `<div class="toast-top">
     <span class="toast-icon">${icon}</span>
     <span class="toast-title">${esc(toast.title || '')}</span>
     <button class="toast-dismiss" onclick="dismissToastCard('${escAttr(id)}')">×</button>
   </div>
-  <div class="toast-body">${esc(toast.body || '')}</div>`;
+  <div class="toast-body">${esc(toast.body || '')}</div>
+  <div class="lume-toast-card-progress"></div>`;
 
   container.appendChild(el);
 
-  // Auto-dismiss after TTL (default 8000ms)
-  const ttlMs = (toast.ttl ? toast.ttl * 1000 : null) || 8000;
+  // Start progress bar animation after element is in DOM
+  requestAnimationFrame(() => {
+    const bar = el.querySelector('.lume-toast-card-progress');
+    if (bar) {
+      bar.style.animationDuration = `${ttlMs}ms`;
+      bar.classList.add('animating');
+    }
+  });
+
   setTimeout(() => removeToastCard(id), ttlMs);
 }
 
@@ -1000,11 +1010,23 @@ function showToast(message, type = 'success', durationMs = 6000) {
     toast.appendChild(message);
   }
 
+  // Progress bar
+  let progressEl = null;
+  if (durationMs > 0) {
+    progressEl = document.createElement('div');
+    progressEl.className = 'lume-toast-progress';
+    toast.appendChild(progressEl);
+  }
+
   document.body.appendChild(toast);
   activeToast = toast;
 
   requestAnimationFrame(() => {
     if (activeToast === toast) toast.classList.add('show');
+    if (progressEl) {
+      progressEl.style.animationDuration = `${durationMs}ms`;
+      progressEl.classList.add('animating');
+    }
   });
 
   if (durationMs > 0) {
