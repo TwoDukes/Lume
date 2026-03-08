@@ -420,15 +420,19 @@ const server = createServer(async (req, res) => {
       const slug = slugifyName(rawName);
       if (!slug || !isValidSlug(slug)) return json(res, 400, { error: "Valid name is required" });
 
+      const ttlDays = typeof bodyJson.ttlDays === "number" && bodyJson.ttlDays > 0 ? bodyJson.ttlDays : null;
+      const expiresAt = ttlDays ? new Date(Date.now() + ttlDays * 86400000).toISOString() : null;
+
       const snapshot = {
         name: rawName || unslug(slug),
         slug,
         savedAt: new Date().toISOString(),
+        ...(expiresAt ? { expiresAt } : {}),
         canvas: canvas || loadState("canvas", null),
       };
 
       writeFileSync(getSnapshotPath(slug), JSON.stringify(snapshot, null, 2));
-      return json(res, 200, { ok: true, slug, shareUrl: `/share/${slug}` });
+      return json(res, 200, { ok: true, slug, shareUrl: `/share/${slug}`, ...(expiresAt ? { expiresAt } : {}) });
     }
 
     if (path === "/api/canvas/snapshots" && req.method === "GET") {
@@ -443,7 +447,8 @@ const server = createServer(async (req, res) => {
           const stat = statSync(filePath);
           const savedAt = parsed?.savedAt || stat.mtime.toISOString();
           const name = parsed?.name || unslug(slug);
-          return { name, slug, shareUrl: `/share/${slug}`, savedAt };
+          const expiresAt = parsed?.expiresAt || null;
+          return { name, slug, shareUrl: `/share/${slug}`, savedAt, ...(expiresAt ? { expiresAt } : {}) };
         })
         .filter(Boolean)
         .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
@@ -487,6 +492,11 @@ const server = createServer(async (req, res) => {
     } catch {
       res.writeHead(500, { "Content-Type": "text/html" });
       return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Snapshot unavailable</h1><p>This snapshot could not be loaded.</p></body></html>');
+    }
+
+    if (snapshot?.expiresAt && new Date(snapshot.expiresAt) < new Date()) {
+      res.writeHead(410, { "Content-Type": "text/html" });
+      return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Link Expired</h1><p>This shared canvas has expired and is no longer available.</p></body></html>');
     }
 
     const payload = {
