@@ -6,7 +6,6 @@ let activeToast = null;
 let activeToastTimer = null;
 
 // --- State ---
-let actionButtons = [];
 let canvasData = null;
 let currentSlug = null;
 let mermaidCounter = 0;
@@ -98,39 +97,15 @@ function handleMessage(msg) {
       clearToastCards();
       break;
 
-    // --- Actions ---
-    case 'actions':
-      actionButtons = Array.isArray(data) ? data : [];
-      renderActions();
-      break;
-
-    case 'action_result':
-      if (data) showActionResult(data);
-      break;
-
     // --- Canvas ---
     case 'canvas':
       canvasData = data;
       renderCanvas();
       loadSnapshots();
-      // Restore any running action button
-      document.querySelectorAll('.action-btn.running').forEach(btn => {
-        const origHTML = btn.dataset.origHtml;
-        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
-        btn.classList.remove('running');
-        btn.style.borderColor = '';
-      });
       break;
 
     case 'canvas_append':
       appendCanvas(data);
-      // Restore any running action button
-      document.querySelectorAll('.action-btn.running').forEach(btn => {
-        const origHTML = btn.dataset.origHtml;
-        if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
-        btn.classList.remove('running');
-        btn.style.borderColor = '';
-      });
       break;
 
     case 'canvas_clear':
@@ -152,7 +127,6 @@ function handleMessage(msg) {
       if (init.toasts && Array.isArray(init.toasts)) {
         init.toasts.forEach(t => showToastCard(t));
       }
-      if (init.actions) { actionButtons = init.actions; renderActions(); }
       if (init.canvas) { canvasData = init.canvas; renderCanvas(); }
       if (init.slug) { currentSlug = init.slug; updateSlugUI(currentSlug); }
       loadSnapshots();
@@ -388,72 +362,14 @@ function clearToastCards() {
 
 window.dismissToastCard = dismissToastCard;
 
-// --- Actions ---
-function renderActions() {
-  const container = $('action-grid');
-  if (!actionButtons.length) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9881;</div>No actions</div>';
-    return;
-  }
-  container.innerHTML = actionButtons.map(a => {
-    const icon = a.label.match(/^\p{Emoji}/u)?.[0] || '';
-    const label = icon ? a.label.slice(icon.length).trim() : a.label;
-    const style = a.color ? `border-color: ${a.color}40` : '';
-    return `<button class="action-btn" style="${style}" onclick="triggerAction('${escAttr(a.id)}', this)" data-id="${escAttr(a.id)}">
-      <div class="action-icon">${icon || '>'}</div>
-      ${esc(label)}
-    </button>`;
-  }).join('');
-}
-
-async function triggerAction(id, btn) {
-  let runningTimeout = null;
-  if (btn) {
-    btn.dataset.origHtml = btn.innerHTML;
-    btn.classList.add('running');
-    btn.innerHTML = '<div class="action-icon"><span class="btn-spinner"></span></div>';
-    runningTimeout = setTimeout(() => {
-      const origHTML = btn.dataset.origHtml;
-      if (origHTML) { btn.innerHTML = origHTML; delete btn.dataset.origHtml; }
-      btn.classList.remove('running');
-      btn.style.borderColor = '';
-    }, 1800000);
-  }
-  try {
-    await apiFetch(`/api/action/${encodeURIComponent(id)}`, { method: 'POST' });
-  } catch (e) {
-    console.error('Action failed:', e);
-    if (btn) {
-      const origHTML = btn.dataset.origHtml || '';
-      btn.innerHTML = '<div class="action-icon">✕</div>Error';
-      btn.style.borderColor = 'var(--red, #F44336)';
-      setTimeout(() => {
-        if (origHTML) btn.innerHTML = origHTML;
-        delete btn.dataset.origHtml;
-        btn.style.borderColor = '';
-        btn.classList.remove('running');
-      }, 2000);
-      if (runningTimeout) clearTimeout(runningTimeout);
-    }
-  }
-}
-
 function showActionResult(data) {
-  const btn = document.querySelector(`.action-btn[data-id="${data.id}"]`);
-  if (btn) {
-    btn.classList.remove('running');
-    const orig = btn.innerHTML;
-    btn.innerHTML = `<div class="action-icon">&#10003;</div>${esc(data.result || 'Done')}`;
-    btn.style.borderColor = 'var(--green)';
-    setTimeout(() => { btn.innerHTML = orig; btn.style.borderColor = ''; }, 2000);
-  }
+  // Legacy support stub — actions panel removed
+  if (!data || !data.id) return;
   if (data.result && data.result.length > 50) {
     canvasData = { text: data.result };
     renderCanvas();
   }
 }
-
-window.triggerAction = triggerAction;
 
 // --- Canvas ---
 let activeCharts = [];
@@ -935,11 +851,7 @@ async function apiFetch(path, opts = {}) {
 // --- Initial data load ---
 async function loadInitial() {
   try {
-    const [actions, canvas] = await Promise.all([
-      apiFetch('/api/actions').catch(() => []),
-      apiFetch('/api/canvas').catch(() => null),
-    ]);
-    if (Array.isArray(actions)) { actionButtons = actions; renderActions(); }
+    const canvas = await apiFetch('/api/canvas').catch(() => null);
     if (canvas && (canvas.type || canvas.blocks)) { canvasData = canvas; renderCanvas(); }
   } catch (e) {
     console.error('Initial load failed:', e);
@@ -1074,13 +986,11 @@ function togglePanel(name) {
   const toggle = $(name + '-toggle');
   if (!toggle) return;
 
-  if (name === 'actions') {
-    const body = document.querySelector('.panel-actions .panel-body');
-    const panel = document.querySelector('.panel-actions');
-    const collapsed = !body.classList.contains('collapsed');
-    body.classList.toggle('collapsed', collapsed);
-    toggle.classList.toggle('collapsed', collapsed);
+  if (name === 'feed') {
+    const panel = document.querySelector('.panel-feed');
+    const collapsed = !panel.classList.contains('panel-collapsed');
     panel.classList.toggle('panel-collapsed', collapsed);
+    toggle.classList.toggle('collapsed', collapsed);
   }
 }
 window.togglePanel = togglePanel;

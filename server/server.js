@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createServer, request as httpRequest } from "http";
+import { createServer } from "http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync, statSync } from "fs";
 import { join, extname, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -106,13 +106,6 @@ function saveState(name, data) {
 }
 
 let toasts  = []; // ephemeral — never persisted
-const DEFAULT_ACTIONS = [
-  { id: "weather",       label: "🌤️ Weather",       color: "#00BCD4" },
-  { id: "hn-top5",       label: "📰 HN Top 5",       color: "#FF6D00" },
-  { id: "server-status", label: "🖥️ Server Status",  color: "#4CAF50" },
-  { id: "surprise",      label: "✨ Surprise",        color: "#9C27B0" },
-];
-let actions = loadState("actions", DEFAULT_ACTIONS);
 let canvas  = loadState("canvas", null);
 let currentSlug = loadState("currentSlug", null);
 
@@ -129,7 +122,7 @@ function broadcast(msg) {
 
 wss.on("connection", (ws) => {
   clients.add(ws);
-  ws.send(JSON.stringify({ type: "init", data: { actions, canvas, slug: currentSlug } }));
+  ws.send(JSON.stringify({ type: "init", data: { canvas, slug: currentSlug } }));
   ws.on("close", () => clients.delete(ws));
   ws.on("error", () => clients.delete(ws));
 });
@@ -220,53 +213,6 @@ function json(res, status, data, headers = {}) {
     ...headers,
   });
   res.end(JSON.stringify(data));
-}
-
-// ─── Action handlers ─────────────────────────────────────────────────────────
-const ACTION_PROMPTS = {
-  weather:        "Check the current weather in San Francisco and push a toast notification to the dashboard, then push a canvas block with details.",
-  "hn-top5":      "Fetch the top 5 Hacker News stories right now and display them as a canvas table with titles and links.",
-  "server-status": "Check this VPS server status — uptime, memory, disk, load — and display it on the canvas.",
-  surprise:       "Surprise Dustin with something interesting, creative, or fun on the canvas. Your choice.",
-  memory:         "Summarize what you know about Dustin and your recent work together, and display it on the canvas.",
-  goodnight:      "Dustin is heading to bed. Give him a thoughtful goodnight on the canvas — recap the day if you can.",
-};
-
-async function handleAction(id, res) {
-  const prompt = ACTION_PROMPTS[id];
-  if (!prompt) return json(res, 404, { error: "Unknown action" });
-  if (!GW_TOKEN) return json(res, 503, { error: "Gateway not configured" });
-
-  json(res, 200, { ok: true, result: "Working on it..." });
-
-  // Notify via gateway
-  const DASH_API = `Dashboard API: POST http://localhost:${PORT}/api/toast, /api/canvas/block, /api/canvas (PUT), DELETE /api/canvas. Auth: Bearer ${TOKEN}. Canvas block types: markdown, code{language,content,title}, chart{config}, table{headers,rows}, image{url,caption}, math{content,display}, mermaid{content}, collapsible{title,blocks}, iframe{url,height}, divider.`;
-
-  const gwUrl = new URL("/v1/chat/completions", GW_URL);
-  const body = JSON.stringify({
-    model: "anthropic/claude-sonnet-4-6",
-    messages: [
-      { role: "system", content: `You are Cyan, an AI assistant. ${DASH_API}` },
-      { role: "user", content: prompt },
-    ],
-  });
-
-  const opts = {
-    hostname: gwUrl.hostname,
-    port: gwUrl.port || 80,
-    path: gwUrl.pathname,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${GW_TOKEN}`,
-      "Content-Length": Buffer.byteLength(body),
-    },
-  };
-
-  const req = httpRequest(opts, () => {});
-  req.on("error", (e) => console.error("Gateway error:", e.message));
-  req.write(body);
-  req.end();
 }
 
 // ─── HTTP server ──────────────────────────────────────────────────────────────
@@ -365,21 +311,6 @@ const server = createServer(async (req, res) => {
       toasts = toasts.filter(c => c.id !== id);
       broadcast({ type: "toast_remove", data: { id } });
       return json(res, 200, { ok: true });
-    }
-
-    // Actions
-    if (path === "/api/actions" && req.method === "GET") return json(res, 200, actions);
-    if (path === "/api/actions" && req.method === "PUT") {
-      actions = Array.isArray(bodyJson) ? bodyJson : [];
-      saveState("actions", actions);
-      broadcast({ type: "actions", data: actions });
-      return json(res, 200, { ok: true });
-    }
-
-    // Action trigger
-    if (path.startsWith("/api/action/") && req.method === "POST") {
-      const id = decodeURIComponent(path.slice(12));
-      return handleAction(id, res);
     }
 
     // Canvas slug identity

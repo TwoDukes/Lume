@@ -21,8 +21,9 @@
 <div class="grid">
 
   <!-- HISTORY (left, full height) -->
-  <div class="panel panel-feed">
-    <div class="panel-header">
+  <div class="panel panel-feed panel-collapsed">
+    <div class="panel-header" onclick="togglePanel('feed')">
+      <span class="panel-toggle collapsed" id="feed-toggle">&#9660;</span>
       HISTORY
       <span class="count" id="history-count">0</span>
     </div>
@@ -36,22 +37,6 @@
 
   <!-- Right column -->
   <div class="right-col">
-
-    <!-- ACTIONS (top-right) -->
-    <div class="panel panel-actions">
-      <div class="panel-header" onclick="togglePanel('actions')">
-        <span class="panel-toggle" id="actions-toggle">&#9660;</span>
-        Actions
-      </div>
-      <div class="panel-body">
-        <div class="action-grid" id="action-grid">
-          <div class="empty-state">
-            <div class="empty-state-icon">&#9881;</div>
-            No actions
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- CANVAS / LAB (bottom-right, larger) -->
     <div class="panel panel-canvas">
