@@ -28,7 +28,6 @@ if (!process.env.LUME_PASSWORD) {
 
 const SESSION_SECRET = crypto.createHash("sha256").update(`${TOKEN}:${LUME_PASSWORD}`).digest("hex");
 const SESSION_COOKIE = "lume_session";
-const sessionTokens = new Set();
 
 function signToken(token) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(token).digest("hex");
@@ -106,7 +105,7 @@ function saveState(name, data) {
   writeFileSync(stateFile(name), JSON.stringify(data, null, 2));
 }
 
-let feed    = loadState("feed", []);
+let toasts  = loadState("toasts", []);
 const DEFAULT_ACTIONS = [
   { id: "weather",       label: "🌤️ Weather",       color: "#00BCD4" },
   { id: "hn-top5",       label: "📰 HN Top 5",       color: "#FF6D00" },
@@ -115,6 +114,7 @@ const DEFAULT_ACTIONS = [
 ];
 let actions = loadState("actions", DEFAULT_ACTIONS);
 let canvas  = loadState("canvas", null);
+let currentSlug = loadState("currentSlug", null);
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 const wss = new WebSocketServer({ noServer: true });
@@ -129,7 +129,7 @@ function broadcast(msg) {
 
 wss.on("connection", (ws) => {
   clients.add(ws);
-  ws.send(JSON.stringify({ type: "init", data: { feed, actions, canvas } }));
+  ws.send(JSON.stringify({ type: "init", data: { toasts, actions, canvas, slug: currentSlug } }));
   ws.on("close", () => clients.delete(ws));
   ws.on("error", () => clients.delete(ws));
 });
@@ -156,10 +156,10 @@ const MIME = {
 function isAuthed(req) {
   const bearer = getBearerToken(req);
   if (bearer === TOKEN) return true;
-  if (bearer && sessionTokens.has(bearer)) return true;
 
+  // Cookie-based: trust any cookie with a valid HMAC signature (survives restarts)
   const sessionToken = getSessionTokenFromCookie(req);
-  if (sessionToken && sessionTokens.has(sessionToken)) return true;
+  if (sessionToken) return true;
 
   return false;
 }
@@ -224,7 +224,7 @@ function json(res, status, data, headers = {}) {
 
 // ─── Action handlers ─────────────────────────────────────────────────────────
 const ACTION_PROMPTS = {
-  weather:        "Check the current weather in San Francisco and push a weather card to the dashboard feed, then push a canvas block with details.",
+  weather:        "Check the current weather in San Francisco and push a toast notification to the dashboard, then push a canvas block with details.",
   "hn-top5":      "Fetch the top 5 Hacker News stories right now and display them as a canvas table with titles and links.",
   "server-status": "Check this VPS server status — uptime, memory, disk, load — and display it on the canvas.",
   surprise:       "Surprise Dustin with something interesting, creative, or fun on the canvas. Your choice.",
@@ -240,7 +240,7 @@ async function handleAction(id, res) {
   json(res, 200, { ok: true, result: "Working on it..." });
 
   // Notify via gateway
-  const DASH_API = `Dashboard API: POST http://localhost:${PORT}/api/feed, /api/canvas/block, /api/canvas (PUT), DELETE /api/canvas. Auth: Bearer ${TOKEN}. Canvas block types: markdown, code{language,content,title}, chart{config}, table{headers,rows}, image{url,caption}, math{content,display}, mermaid{content}, collapsible{title,blocks}, iframe{url,height}, divider.`;
+  const DASH_API = `Dashboard API: POST http://localhost:${PORT}/api/toast, /api/canvas/block, /api/canvas (PUT), DELETE /api/canvas. Auth: Bearer ${TOKEN}. Canvas block types: markdown, code{language,content,title}, chart{config}, table{headers,rows}, image{url,caption}, math{content,display}, mermaid{content}, collapsible{title,blocks}, iframe{url,height}, divider.`;
 
   const gwUrl = new URL("/v1/chat/completions", GW_URL);
   const body = JSON.stringify({
@@ -305,7 +305,6 @@ const server = createServer(async (req, res) => {
     }
 
     const sessionToken = crypto.randomBytes(32).toString("base64url");
-    sessionTokens.add(sessionToken);
     const packed = encodeSession(sessionToken);
 
     const cookieHeader = cookie.serialize(SESSION_COOKIE, packed, {
@@ -321,10 +320,7 @@ const server = createServer(async (req, res) => {
 
   // Public auth route: logout API (doesn't require auth)
   if (req.method === "POST" && path === "/auth/logout") {
-    const sessionToken = getSessionTokenFromCookie(req);
     const bearer = getBearerToken(req);
-    if (sessionToken) sessionTokens.delete(sessionToken);
-    if (bearer && bearer !== TOKEN) sessionTokens.delete(bearer);
 
     const clearCookie = cookie.serialize(SESSION_COOKIE, "", {
       httpOnly: true,
@@ -354,22 +350,22 @@ const server = createServer(async (req, res) => {
     const body = await readBody(req);
     const bodyJson = body.length ? (() => { try { return JSON.parse(body); } catch { return {}; } })() : {};
 
-    // Feed
-    if (path === "/api/feed" && req.method === "GET") return json(res, 200, feed);
-    if (path === "/api/feed" && req.method === "POST") {
+    // Toast
+    if (path === "/api/toast" && req.method === "GET") return json(res, 200, toasts);
+    if (path === "/api/toast" && req.method === "POST") {
       if (!bodyJson.title || typeof bodyJson.title !== 'string') return json(res, 400, { error: 'title is required' });
       const card = { ...bodyJson, timestamp: bodyJson.timestamp || new Date().toISOString() };
-      const idx = card.id ? feed.findIndex(c => c.id === card.id) : -1;
-      if (idx >= 0) feed[idx] = card; else feed.unshift(card);
-      saveState("feed", feed);
-      broadcast({ type: "feed_update", data: card });
+      const idx = card.id ? toasts.findIndex(c => c.id === card.id) : -1;
+      if (idx >= 0) toasts[idx] = card; else toasts.unshift(card);
+      saveState("toasts", toasts);
+      broadcast({ type: "toast_update", data: card });
       return json(res, 200, { ok: true });
     }
-    if (path.startsWith("/api/feed/") && req.method === "DELETE") {
-      const id = decodeURIComponent(path.slice(10));
-      feed = feed.filter(c => c.id !== id);
-      saveState("feed", feed);
-      broadcast({ type: "feed_remove", data: { id } });
+    if (path.startsWith("/api/toast/") && req.method === "DELETE") {
+      const id = decodeURIComponent(path.slice(11));
+      toasts = toasts.filter(c => c.id !== id);
+      saveState("toasts", toasts);
+      broadcast({ type: "toast_remove", data: { id } });
       return json(res, 200, { ok: true });
     }
 
@@ -388,12 +384,70 @@ const server = createServer(async (req, res) => {
       return handleAction(id, res);
     }
 
+    // Canvas slug identity
+    if (path === "/api/canvas/slug" && req.method === "GET") return json(res, 200, { slug: currentSlug });
+    if (path === "/api/canvas/slug" && req.method === "DELETE") {
+      currentSlug = null;
+      saveState("currentSlug", null);
+      broadcast({ type: "canvas_slug", data: { slug: null } });
+      return json(res, 200, { ok: true });
+    }
+
     // Canvas
     if (path === "/api/canvas" && req.method === "GET") return json(res, 200, canvas || {});
     if (path === "/api/canvas" && req.method === "PUT") {
-      canvas = bodyJson;
+      // Accept slug from header or body fallback
+      const slugHeader = req.headers["x-canvas-slug"];
+      const slugBody = (bodyJson && typeof bodyJson.slug === "string") ? bodyJson.slug : null;
+      const slug = slugHeader || slugBody;
+
+      // Strip slug from canvas content if it came from body
+      let canvasContent = bodyJson;
+      if (slugBody && !slugHeader) {
+        canvasContent = { ...bodyJson };
+        delete canvasContent.slug;
+      }
+
+      canvas = canvasContent;
       saveState("canvas", canvas);
       broadcast({ type: "canvas", data: canvas });
+
+      if (slug && isValidSlug(slug)) {
+        currentSlug = slug;
+        saveState("currentSlug", currentSlug);
+
+        // Upsert snapshot — preserve name + pinned state if file exists
+        const snapshotPath = getSnapshotPath(slug);
+        let existingName = null;
+        let isPinned = false;
+        if (existsSync(snapshotPath)) {
+          try {
+            const existing = JSON.parse(readFileSync(snapshotPath, "utf8"));
+            existingName = existing?.name || null;
+            isPinned = existing?.expiresAt === null;
+          } catch {}
+        }
+        const now = new Date().toISOString();
+        const existing = existsSync(snapshotPath) ? (() => { try { return JSON.parse(readFileSync(snapshotPath, "utf8")); } catch { return null; } })() : null;
+        const createdAt = existing?.createdAt || now;
+        const isPrivate = existing ? (existing?.private ?? true) : true; // private by default
+        // Only reset TTL if content actually changed
+        const contentChanged = !existing || JSON.stringify(existing.canvas) !== JSON.stringify(canvas);
+        const expiresAt = isPinned ? null : (contentChanged ? new Date(Date.now() + 14 * 86400000).toISOString() : (existing?.expiresAt ?? new Date(Date.now() + 14 * 86400000).toISOString()));
+        const snapshot = {
+          name: existingName || unslug(slug),
+          slug,
+          createdAt,
+          savedAt: now,
+          expiresAt,
+          ...(isPrivate ? { private: true } : {}),
+          canvas,
+        };
+        writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+
+        broadcast({ type: "canvas_slug", data: { slug } });
+      }
+
       return json(res, 200, { ok: true });
     }
     if (path === "/api/canvas" && req.method === "DELETE") {
@@ -446,14 +500,60 @@ const server = createServer(async (req, res) => {
           try { parsed = JSON.parse(readFileSync(filePath, "utf8")); } catch {}
           const stat = statSync(filePath);
           const savedAt = parsed?.savedAt || stat.mtime.toISOString();
+          const createdAt = parsed?.createdAt || savedAt;
           const name = parsed?.name || unslug(slug);
-          const expiresAt = parsed?.expiresAt || null;
-          return { name, slug, shareUrl: `/share/${slug}`, savedAt, ...(expiresAt ? { expiresAt } : {}) };
+          const hasExpiresAt = parsed !== null && typeof parsed === "object" && "expiresAt" in parsed;
+          const expiresAt = hasExpiresAt ? parsed.expiresAt : undefined;
+          const isPrivate = parsed?.private || false;
+          return { name, slug, shareUrl: `/share/${slug}`, savedAt, createdAt, ...(expiresAt !== undefined ? { expiresAt } : {}), ...(isPrivate ? { private: true } : {}) };
         })
         .filter(Boolean)
-        .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+        .sort((a, b) => new Date(b.createdAt || b.savedAt).getTime() - new Date(a.createdAt || a.savedAt).getTime());
 
       return json(res, 200, list);
+    }
+
+    if (path.startsWith("/api/canvas/snapshots/") && path.endsWith("/pin") && req.method === "POST") {
+      const slug = decodeURIComponent(path.slice("/api/canvas/snapshots/".length, -4));
+      if (!isValidSlug(slug)) return json(res, 400, { error: "Invalid slug" });
+      const filePath = getSnapshotPath(slug);
+      if (!existsSync(filePath)) return json(res, 404, { error: "Snapshot not found" });
+      try {
+        const snapshot = JSON.parse(readFileSync(filePath, "utf8"));
+        snapshot.expiresAt = null;
+        writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
+        return json(res, 200, { ok: true });
+      } catch {
+        return json(res, 500, { error: "Failed to pin snapshot" });
+      }
+    }
+
+    if (path.startsWith("/api/canvas/snapshots/") && path.endsWith("/privacy") && req.method === "POST") {
+      const slug = decodeURIComponent(path.slice("/api/canvas/snapshots/".length, -8));
+      if (!isValidSlug(slug)) return json(res, 400, { error: "Invalid slug" });
+      const filePath = getSnapshotPath(slug);
+      if (!existsSync(filePath)) return json(res, 404, { error: "Snapshot not found" });
+      try {
+        const snapshot = JSON.parse(readFileSync(filePath, "utf8"));
+        snapshot.private = !snapshot.private;
+        writeFileSync(filePath, JSON.stringify(snapshot, null, 2));
+        return json(res, 200, { ok: true, private: snapshot.private });
+      } catch {
+        return json(res, 500, { error: "Failed to update privacy" });
+      }
+    }
+
+    if (path.startsWith("/api/canvas/snapshots/") && req.method === "GET") {
+      const slug = decodeURIComponent(path.slice("/api/canvas/snapshots/".length));
+      if (!isValidSlug(slug)) return json(res, 400, { error: "Invalid slug" });
+      const filePath = getSnapshotPath(slug);
+      if (!existsSync(filePath)) return json(res, 404, { error: "Snapshot not found" });
+      try {
+        const snapshot = JSON.parse(readFileSync(filePath, "utf8"));
+        return json(res, 200, snapshot);
+      } catch {
+        return json(res, 500, { error: "Failed to read snapshot" });
+      }
     }
 
     if (path.startsWith("/api/canvas/snapshots/") && req.method === "DELETE") {
@@ -497,6 +597,11 @@ const server = createServer(async (req, res) => {
     if (snapshot?.expiresAt && new Date(snapshot.expiresAt) < new Date()) {
       res.writeHead(410, { "Content-Type": "text/html" });
       return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Link Expired</h1><p>This shared canvas has expired and is no longer available.</p></body></html>');
+    }
+
+    if (snapshot?.private) {
+      res.writeHead(404, { "Content-Type": "text/html" });
+      return res.end('<!doctype html><html><body style="background:#000;color:#e0e0e0;font-family:system-ui;padding:24px"><h1 style="color:#00BCD4">Not Found</h1><p>This shared canvas does not exist.</p></body></html>');
     }
 
     const payload = {
@@ -552,7 +657,7 @@ const server = createServer(async (req, res) => {
 server.on("upgrade", (req, socket, head) => {
   const bearer = getBearerToken(req);
   const cookieToken = getSessionTokenFromCookie(req);
-  const valid = bearer === TOKEN || (bearer && sessionTokens.has(bearer)) || (cookieToken && sessionTokens.has(cookieToken));
+  const valid = bearer === TOKEN || !!cookieToken;
   if (!valid) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); return socket.destroy(); }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });

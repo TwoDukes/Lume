@@ -6,10 +6,11 @@ let activeToast = null;
 let activeToastTimer = null;
 
 // --- State ---
-let feedCards = [];
 let actionButtons = [];
 let canvasData = null;
+let currentSlug = null;
 let mermaidCounter = 0;
+let snapshotPollTimer = null;
 
 // --- Init libs ---
 if (typeof mermaid !== 'undefined') {
@@ -84,34 +85,17 @@ function handleMessage(msg) {
   const data = msg.data;
 
   switch (msg.type) {
-    // --- Feed ---
-    case 'feed':
-      feedCards = Array.isArray(data) ? data : [];
-      renderFeed();
+    // --- Toasts ---
+    case 'toast_update':
+      if (data) showToastCard(data);
       break;
 
-    case 'feed_update':
-      if (data) {
-        const idx = data.id ? feedCards.findIndex(c => c.id === data.id) : -1;
-        if (idx >= 0) {
-          feedCards[idx] = data;
-        } else {
-          feedCards.unshift(data);
-        }
-        renderFeed();
-      }
+    case 'toast_remove':
+      if (data && data.id) removeToastCard(data.id);
       break;
 
-    case 'feed_remove':
-      if (data && data.id) {
-        feedCards = feedCards.filter(c => c.id !== data.id);
-        renderFeed();
-      }
-      break;
-
-    case 'feed_clear':
-      feedCards = [];
-      renderFeed();
+    case 'toast_clear':
+      clearToastCards();
       break;
 
     // --- Actions ---
@@ -128,6 +112,7 @@ function handleMessage(msg) {
     case 'canvas':
       canvasData = data;
       renderCanvas();
+      loadSnapshots();
       // Restore any running action button
       document.querySelectorAll('.action-btn.running').forEach(btn => {
         const origHTML = btn.dataset.origHtml;
@@ -153,13 +138,24 @@ function handleMessage(msg) {
       renderCanvas();
       break;
 
+    // --- Canvas slug ---
+    case 'canvas_slug':
+      currentSlug = data.slug;
+      updateSlugUI(currentSlug);
+      loadSnapshots();
+      break;
+
     // --- Init ---
     case 'welcome':
     case 'init':
       const init = data || msg;
-      if (init.feed) { feedCards = init.feed; renderFeed(); }
+      if (init.toasts && Array.isArray(init.toasts)) {
+        init.toasts.forEach(t => showToastCard(t));
+      }
       if (init.actions) { actionButtons = init.actions; renderActions(); }
       if (init.canvas) { canvasData = init.canvas; renderCanvas(); }
+      if (init.slug) { currentSlug = init.slug; updateSlugUI(currentSlug); }
+      loadSnapshots();
       break;
 
     default:
@@ -167,87 +163,220 @@ function handleMessage(msg) {
   }
 }
 
-// --- Feed ---
-function renderFeed() {
-  // Expire TTL cards
-  const now = Date.now();
-  feedCards = feedCards.filter(c => {
-    if (!c.ttl || !c.timestamp) return true;
-    return now - new Date(c.timestamp).getTime() < c.ttl * 1000;
-  });
+// --- Snapshot Browser ---
+async function loadSnapshots() {
+  try {
+    const data = await apiFetch('/api/canvas/snapshots');
+    if (Array.isArray(data)) renderSnapshots(data);
+  } catch (e) {
+    console.error('Failed to load snapshots:', e);
+  }
+}
 
-  const container = $('feed-cards');
-  const count = $('feed-count');
-  if (!feedCards.length) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#9673;</div>Waiting for updates</div>';
+function updateSlugUI(slug) {
+  const el = document.getElementById('canvas-slug-label');
+  if (!el) return;
+  el.textContent = slug ? slug.replace(/-/g, ' ') : '';
+}
+
+function renderSnapshots(snapshots) {
+  const container = $('history-list');
+  const count = $('history-count');
+  if (!snapshots || !snapshots.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div>No snapshots yet</div></div>';
     count.textContent = '0';
     return;
   }
-  count.textContent = feedCards.length;
-  container.innerHTML = feedCards.map(cardHTML).join('');
-
-  // Schedule TTL removals
-  feedCards.forEach(c => {
-    if (!c.ttl || !c.timestamp) return;
-    const remaining = (c.ttl * 1000) - (now - new Date(c.timestamp).getTime());
-    if (remaining > 0) {
-      setTimeout(() => {
-        const el = document.querySelector(`.feed-card[data-id="${c.id}"]`);
-        if (el) el.classList.add('expiring');
-        setTimeout(() => {
-          feedCards = feedCards.filter(fc => fc.id !== c.id);
-          renderFeed();
-        }, 400);
-      }, remaining);
-    }
-  });
+  count.textContent = snapshots.length;
+  container.innerHTML = snapshots.map(s => snapshotCardHTML(s)).join('');
 }
 
-function cardHTML(card) {
-  const time = card.timestamp ? timeAgo(new Date(card.timestamp)) : '';
-  const icon = card.icon || '';
-  const typeCls = card.type ? ` card-${card.type}` : '';
-  const highCls = card.priority === 'high' ? ' high' : '';
-  const linkCls = card.link ? ' has-link' : '';
-  const tsAttr = card.timestamp ? ` data-ts="${escAttr(card.timestamp)}"` : '';
-
-  let actionBtn = '';
-  if (card.action) {
-    actionBtn = `<div class="feed-card-action"><button onclick="event.stopPropagation();triggerCardAction('${escAttr(card.action.endpoint)}')">${esc(card.action.label)}</button></div>`;
-  }
-
-  let image = '';
-  if (card.image) {
-    const longBody = (card.body || '').length > 80;
-    image = longBody
-      ? `<div class="feed-card-img full"><img src="${escAttr(card.image)}" loading="lazy" alt=""></div>`
-      : `<img class="feed-card-thumb" src="${escAttr(card.image)}" loading="lazy" alt="">`;
-  }
-
-  const linkIcon = card.link ? '<span class="feed-card-link-icon">&#8599;</span>' : '';
-  const onclick = card.link ? ` onclick="window.open('${escAttr(card.link)}','_blank')"` : '';
-
-  const thumbInline = (card.image && (card.body || '').length <= 80) ? image : '';
-  const imgBelow = (card.image && (card.body || '').length > 80) ? image : '';
-
-  return `<div class="feed-card${typeCls}${highCls}${linkCls}" data-id="${escAttr(card.id || '')}"${onclick}>
-    <div class="feed-card-top">
-      <div class="feed-card-title">${icon} ${esc(card.title || '')}</div>
-      <div class="feed-card-top-right">${linkIcon}<span class="feed-card-time"${tsAttr}>${time}</span></div>
+function snapshotCardHTML(s) {
+  const date = s.savedAt ? new Date(s.savedAt).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+  const expiry = expiryBadge(s.expiresAt, s.private);
+  return `<div class="snapshot-card">
+    <div class="snapshot-card-top">
+      <div class="snapshot-name snapshot-clickable" onclick="loadSnapshot('${escAttr(s.slug)}')">${esc(s.name)}</div>
+      <div class="snapshot-kebab-wrap">
+        <button class="snapshot-kebab" onclick="toggleSnapshotMenu(this)">⋮</button>
+        <div class="snapshot-menu">
+          <button onclick="shareSnapshot('${escAttr(s.slug)}', ${!!s.private});closeSnapshotMenus()">Share</button>
+          ${!s.private ? `<button onclick="togglePrivacy('${escAttr(s.slug)}');closeSnapshotMenus()">Make Private</button>` : ''}
+          <button onclick="pinSnapshot('${escAttr(s.slug)}');closeSnapshotMenus()">Pin</button>
+          <button class="danger" onclick="deleteSnapshot('${escAttr(s.slug)}');closeSnapshotMenus()">Delete</button>
+        </div>
+      </div>
     </div>
-    <div class="feed-card-content">
-      <div class="feed-card-body">${esc(card.body || '')}</div>
-      ${thumbInline}
-    </div>
-    ${imgBelow}
-    ${actionBtn}
+    <div class="snapshot-meta">${date}${expiry}</div>
   </div>`;
 }
 
-async function triggerCardAction(endpoint) {
-  try { await apiFetch(endpoint); } catch (e) { console.error('Card action failed:', e); }
+function toggleSnapshotMenu(btn) {
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.classList.contains('open');
+  closeSnapshotMenus();
+  if (!isOpen) menu.classList.add('open');
 }
-window.triggerCardAction = triggerCardAction;
+
+function closeSnapshotMenus() {
+  document.querySelectorAll('.snapshot-menu.open').forEach(m => m.classList.remove('open'));
+}
+
+function expiryBadge(expiresAt, isPrivate) {
+  const parts = [];
+  if (!isPrivate) parts.push('<span class="expiry-badge shared">shared</span>');
+  if (expiresAt === null) {
+    parts.push('<span class="expiry-badge pinned">📌 pinned</span>');
+  } else if (expiresAt) {
+    const ms = new Date(expiresAt) - Date.now();
+    if (ms < 0) parts.push('<span class="expiry-badge expired">Expired</span>');
+    else {
+      const days = Math.ceil(ms / 86400000);
+      parts.push(`<span class="${days <= 3 ? 'expiry-badge soon' : 'expiry-badge'}">Expires in ${days}d</span>`);
+    }
+  }
+  return parts.length ? ' ' + parts.join(' ') : '';
+}
+
+async function togglePrivacy(slug) {
+  await apiFetch(`/api/canvas/snapshots/${slug}/privacy`, { method: 'POST' });
+  loadSnapshots();
+}
+window.togglePrivacy = togglePrivacy;
+
+async function loadSnapshot(slug) {
+  try {
+    const snap = await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(slug)}`);
+    if (!snap || !snap.canvas) return;
+    await apiFetch('/api/canvas', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json', 'X-Canvas-Slug': slug},
+      body: JSON.stringify(snap.canvas),
+    });
+    canvasData = snap.canvas;
+    renderCanvas();
+    currentSlug = slug;
+    updateSlugUI(slug);
+  } catch (e) {
+    console.error('Failed to load snapshot:', e);
+  }
+}
+
+async function deleteSnapshot(slug) {
+  if (!confirm(`Delete snapshot "${slug}"?`)) return;
+  try {
+    await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    loadSnapshots();
+  } catch (e) {
+    console.error('Failed to delete snapshot:', e);
+  }
+}
+
+async function pinSnapshot(slug) {
+  try {
+    await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(slug)}/pin`, { method: 'POST' });
+    loadSnapshots();
+  } catch (e) {
+    console.error('Failed to pin snapshot:', e);
+  }
+}
+
+function copyShareLink(slug) {
+  const fullUrl = window.location.origin + `/share/${slug}`;
+  const body = document.createElement('div');
+  body.className = 'lume-toast-body';
+  const msg = document.createElement('div');
+  msg.className = 'lume-toast-message';
+  msg.textContent = fullUrl;
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'lume-toast-copy';
+  copyBtn.textContent = 'Copy';
+  copyBtn.type = 'button';
+  copyBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(fullUrl);
+      } else {
+        const tmp = document.createElement('input');
+        tmp.value = fullUrl; document.body.appendChild(tmp);
+        tmp.select(); document.execCommand('copy');
+        document.body.removeChild(tmp);
+      }
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1400);
+    } catch { copyBtn.textContent = 'Copy failed'; }
+  });
+  body.appendChild(msg);
+  body.appendChild(copyBtn);
+  showToast(body, 'success', 6000);
+}
+
+async function shareSnapshot(slug, isPrivate) {
+  if (isPrivate) {
+    await apiFetch(`/api/canvas/snapshots/${slug}/privacy`, { method: 'POST' });
+    await loadSnapshots();
+  }
+  copyShareLink(slug);
+}
+
+window.loadSnapshot = loadSnapshot;
+window.deleteSnapshot = deleteSnapshot;
+window.copyShareLink = copyShareLink;
+window.shareSnapshot = shareSnapshot;
+window.pinSnapshot = pinSnapshot;
+window.toggleSnapshotMenu = toggleSnapshotMenu;
+window.closeSnapshotMenus = closeSnapshotMenus;
+
+// --- Toast Cards (WS-driven, bottom-right stack) ---
+function showToastCard(toast) {
+  const container = $('toast-container');
+  if (!container) return;
+
+  // Remove existing card with same id
+  if (toast.id) {
+    const existing = container.querySelector(`.lume-toast-card[data-id="${escAttr(toast.id)}"]`);
+    if (existing) existing.remove();
+  }
+
+  const typeCls = toast.type ? ` card-${toast.type}` : '';
+  const id = toast.id || ('t-' + Math.random().toString(36).slice(2, 8));
+  const icon = toast.icon || '';
+
+  const el = document.createElement('div');
+  el.className = `lume-toast-card${typeCls}`;
+  el.dataset.id = id;
+  el.innerHTML = `<div class="toast-top">
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-title">${esc(toast.title || '')}</span>
+    <button class="toast-dismiss" onclick="dismissToastCard('${escAttr(id)}')">×</button>
+  </div>
+  <div class="toast-body">${esc(toast.body || '')}</div>`;
+
+  container.appendChild(el);
+
+  // Auto-dismiss after TTL (default 8000ms)
+  const ttlMs = (toast.ttl ? toast.ttl * 1000 : null) || 8000;
+  setTimeout(() => removeToastCard(id), ttlMs);
+}
+
+function dismissToastCard(id) {
+  removeToastCard(id);
+}
+
+function removeToastCard(id) {
+  const container = $('toast-container');
+  if (!container) return;
+  const el = container.querySelector(`[data-id="${escAttr(id)}"]`);
+  if (el) el.remove();
+}
+
+function clearToastCards() {
+  const container = $('toast-container');
+  if (container) container.innerHTML = '';
+}
+
+window.dismissToastCard = dismissToastCard;
 
 // --- Actions ---
 function renderActions() {
@@ -796,17 +925,19 @@ async function apiFetch(path, opts = {}) {
 // --- Initial data load ---
 async function loadInitial() {
   try {
-    const [feed, actions, canvas] = await Promise.all([
-      apiFetch('/api/feed').catch(() => []),
+    const [actions, canvas] = await Promise.all([
       apiFetch('/api/actions').catch(() => []),
       apiFetch('/api/canvas').catch(() => null),
     ]);
-    if (Array.isArray(feed)) { feedCards = feed; renderFeed(); }
     if (Array.isArray(actions)) { actionButtons = actions; renderActions(); }
-    if (canvas) { canvasData = canvas; renderCanvas(); }
+    if (canvas && (canvas.type || canvas.blocks)) { canvasData = canvas; renderCanvas(); }
   } catch (e) {
     console.error('Initial load failed:', e);
   }
+  loadSnapshots();
+  // Poll snapshots every 30s
+  if (snapshotPollTimer) clearInterval(snapshotPollTimer);
+  snapshotPollTimer = setInterval(loadSnapshots, 30000);
 }
 
 // --- Utils ---
@@ -828,25 +959,11 @@ function timeAgo(date) {
   return Math.floor(s / 86400) + 'd ago';
 }
 
-// --- Live timestamp refresh + TTL check ---
+// --- Live timestamp refresh ---
 setInterval(() => {
   document.querySelectorAll('.feed-card-time[data-ts]').forEach(el => {
     el.textContent = timeAgo(new Date(el.dataset.ts));
   });
-  // Re-check TTLs
-  const now = Date.now();
-  const expired = feedCards.filter(c => c.ttl && c.timestamp &&
-    now - new Date(c.timestamp).getTime() >= c.ttl * 1000);
-  if (expired.length) {
-    expired.forEach(c => {
-      const el = document.querySelector(`.feed-card[data-id="${c.id}"]`);
-      if (el) el.classList.add('expiring');
-    });
-    setTimeout(() => {
-      feedCards = feedCards.filter(c => !expired.includes(c));
-      renderFeed();
-    }, 400);
-  }
 }, 30000);
 
 function dismissToast() {
@@ -900,70 +1017,32 @@ function showToast(message, type = 'success', durationMs = 6000) {
 }
 
 async function shareCanvas() {
-  // Auto-generate name from first heading in canvas, fallback to timestamp
-  function autoName() {
-    const first = document.querySelector('.canvas-content .canvas-block');
-    if (first) {
-      const h = first.querySelector('h1,h2,h3');
-      if (h) return h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-    }
-    return 'canvas-' + new Date().toISOString().slice(0,10);
+  if (!currentSlug) {
+    showToast('No canvas identity — load a canvas from Snapshots first', 'error', 3000);
+    return;
   }
-  const name = autoName();
 
+  const fullUrl = `https://lume.cyanlab.ai/share/${currentSlug}`;
   const shareBtn = $('share-btn');
-  if (shareBtn) shareBtn.disabled = true;
 
   try {
-    const result = await apiFetch('/api/canvas/snapshot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(fullUrl);
+    } else {
+      const tmp = document.createElement('input');
+      tmp.value = fullUrl; document.body.appendChild(tmp);
+      tmp.select(); document.execCommand('copy');
+      document.body.removeChild(tmp);
+    }
 
-    const sharePath = result?.shareUrl;
-    if (!sharePath) throw new Error('Missing share URL');
-
-    const fullUrl = window.location.origin + sharePath;
-
-    const body = document.createElement('div');
-    body.className = 'lume-toast-body';
-
-    const msg = document.createElement('div');
-    msg.className = 'lume-toast-message';
-    msg.textContent = fullUrl;
-
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'lume-toast-copy';
-    copyBtn.textContent = 'Copy';
-    copyBtn.type = 'button';
-
-    copyBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(fullUrl);
-        } else {
-          const tmp = document.createElement('input');
-          tmp.value = fullUrl; document.body.appendChild(tmp);
-          tmp.select(); document.execCommand('copy');
-          document.body.removeChild(tmp);
-        }
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1400);
-      } catch (err) {
-        copyBtn.textContent = 'Copy failed';
-      }
-    });
-
-    body.appendChild(msg);
-    body.appendChild(copyBtn);
-    showToast(body, 'success', 6000);
+    if (shareBtn) {
+      const origHTML = shareBtn.innerHTML;
+      shareBtn.textContent = 'Link copied!';
+      setTimeout(() => { shareBtn.innerHTML = origHTML; }, 2000);
+    }
   } catch (e) {
-    console.error('Snapshot save failed:', e);
-    showToast('Failed to save snapshot', 'error', 2200);
-  } finally {
-    if (shareBtn) shareBtn.disabled = false;
+    console.error('Copy failed:', e);
+    showToast('Copy failed', 'error', 2200);
   }
 }
 window.shareCanvas = shareCanvas;
@@ -973,12 +1052,7 @@ function togglePanel(name) {
   const toggle = $(name + '-toggle');
   if (!toggle) return;
 
-  if (name === 'feed') {
-    const panel = document.querySelector('.panel-feed');
-    const collapsed = !panel.classList.contains('panel-collapsed');
-    panel.classList.toggle('panel-collapsed', collapsed);
-    toggle.classList.toggle('collapsed', collapsed);
-  } else if (name === 'actions') {
+  if (name === 'actions') {
     const body = document.querySelector('.panel-actions .panel-body');
     const panel = document.querySelector('.panel-actions');
     const collapsed = !body.classList.contains('collapsed');
@@ -994,17 +1068,9 @@ async function resetDashboard() {
   if (btn) btn.disabled = true;
   try {
     await apiFetch('/api/canvas', { method: 'DELETE' }).catch(() => null);
-
-    const cards = [...feedCards];
-    await Promise.all(cards
-      .filter(card => card && card.id)
-      .map(card => apiFetch(`/api/feed/${encodeURIComponent(card.id)}`, { method: 'DELETE' }).catch(() => null))
-    );
-
     canvasData = null;
-    feedCards = [];
     renderCanvas();
-    renderFeed();
+    clearToastCards();
   } catch (e) {
     console.error('Reset failed:', e);
   } finally {
@@ -1013,6 +1079,11 @@ async function resetDashboard() {
 }
 window.resetDashboard = resetDashboard;
 
+
+// Close snapshot menus on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.snapshot-kebab-wrap')) closeSnapshotMenus();
+});
 
 // --- Boot ---
 loadInitial();

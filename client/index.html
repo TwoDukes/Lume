@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <title>Cyan</title>
+  <link rel="icon" type="image/svg+xml" href="https://cyanlab.ai/favicon.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,17 +20,16 @@
 
 <div class="grid">
 
-  <!-- FEED (left, full height) -->
+  <!-- HISTORY (left, full height) -->
   <div class="panel panel-feed">
-    <div class="panel-header" onclick="togglePanel('feed')">
-      <span class="panel-toggle" id="feed-toggle">&#9660;</span>
-      Feed
-      <span class="count" id="feed-count">0</span>
+    <div class="panel-header">
+      HISTORY
+      <span class="count" id="history-count">0</span>
     </div>
-    <div class="panel-body" id="feed-cards">
+    <div class="panel-body" id="history-list">
       <div class="empty-state">
-        <div class="empty-state-icon">&#9673;</div>
-        Waiting for updates
+        <div class="empty-state-icon">📭</div>
+        No snapshots yet
       </div>
     </div>
   </div>
@@ -56,9 +56,9 @@
     <!-- CANVAS / LAB (bottom-right, larger) -->
     <div class="panel panel-canvas">
       <div class="panel-header">
-        <span>Canvas</span>
+        <span>Canvas</span><span id="canvas-slug-label" class="canvas-slug-label"></span>
         <div class="canvas-header-actions">
-          <button id="share-btn" onclick="event.stopPropagation(); shareCanvas()" title="Create share link">🔗 Share</button>
+          <button id="share-btn" onclick="event.stopPropagation(); shareCanvas()" title="Copy share link">🔗 Share</button>
 
         </div>
       </div>
@@ -85,5 +85,6 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="/config.js"></script>
   <script src="app.js"></script>
+<div id="toast-container"></div>
 </body>
 </html>
