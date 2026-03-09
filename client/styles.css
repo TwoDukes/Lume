@@ -885,13 +885,28 @@ body {
   }
 }
 
-/* Narrow screens — stack vertically */
+/* Narrow screens — canvas-first layout */
 @media (max-width: 500px) {
   .grid {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column-reverse; /* canvas on top, history below */
   }
-  .right-col { border-left: none; }
-  .panel-feed { max-height: 40vh; }
+  .right-col {
+    border-left: none;
+    flex: 1;
+    min-height: 0;
+  }
+  .left-col {
+    max-height: 38vh;
+    overflow: hidden;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border, #222);
+  }
+  .panel-feed {
+    max-height: 34vh;
+    overflow-y: auto;
+  }
 }
 
 /* Scroll works everywhere; mermaid wrapper handles its own touch */
