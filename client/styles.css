@@ -885,28 +885,53 @@ body {
   }
 }
 
-/* Narrow screens — canvas-first layout */
+/* Narrow screens — canvas-first: history collapses to a slim side strip */
 @media (max-width: 500px) {
   .grid {
-    grid-template-columns: 1fr;
-    display: flex;
-    flex-direction: column-reverse; /* canvas on top, history below */
-  }
-  .right-col {
-    border-left: none;
-    flex: 1;
-    min-height: 0;
-  }
-  .left-col {
-    max-height: 38vh;
-    overflow: hidden;
-    flex-shrink: 0;
-    border-top: 1px solid var(--border, #222);
+    grid-template-columns: 36px 1fr;
   }
   .panel-feed {
-    max-height: 34vh;
-    overflow-y: auto;
+    width: 36px !important;
   }
+  .panel-feed .panel-body {
+    display: none !important;
+  }
+  .panel-feed .panel-header {
+    writing-mode: vertical-lr;
+    text-orientation: mixed;
+    padding: 10px 8px;
+    height: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .panel-feed .panel-toggle {
+    transform: rotate(-90deg);
+  }
+  /* When user taps to expand, let it slide over the canvas as an overlay */
+  .panel-feed:not(.panel-collapsed) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: clamp(220px, 70vw, 320px) !important;
+    z-index: 50;
+    background: var(--bg);
+    border-right: 1px solid var(--card-border);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+  }
+  .panel-feed:not(.panel-collapsed) .panel-body {
+    display: flex !important;
+  }
+  .panel-feed:not(.panel-collapsed) .panel-header {
+    writing-mode: initial;
+    text-orientation: initial;
+    padding: 10px 12px;
+    height: auto;
+  }
+  .panel-feed:not(.panel-collapsed) .panel-toggle {
+    transform: none;
+  }
+  .grid { position: relative; }
 }
 
 /* Scroll works everywhere; mermaid wrapper handles its own touch */
