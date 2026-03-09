@@ -1001,6 +1001,10 @@ body { touch-action: pan-y; }
   padding: 10px 12px;
   margin-bottom: 8px;
 }
+.snapshot-card-active {
+  border-color: var(--accent, #00BCD4);
+  box-shadow: 0 0 0 1px var(--accent, #00BCD4);
+}
 .snapshot-card-top {
   display: flex;
   align-items: flex-start;

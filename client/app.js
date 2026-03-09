@@ -168,7 +168,8 @@ function renderSnapshots(snapshots) {
 function snapshotCardHTML(s) {
   const date = s.savedAt ? new Date(s.savedAt).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
   const expiry = expiryBadge(s.expiresAt, s.private);
-  return `<div class="snapshot-card">
+  const isActive = s.slug === currentSlug;
+  return `<div class="snapshot-card${isActive ? ' snapshot-card-active' : ''}">
     <div class="snapshot-card-top">
       <div class="snapshot-name snapshot-clickable" onclick="loadSnapshot('${escAttr(s.slug)}')">${esc(s.name)}</div>
       <div class="snapshot-kebab-wrap">
