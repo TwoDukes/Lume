@@ -885,6 +885,45 @@ body {
   }
 }
 
+/* Narrow screens — history cards tightened for overlay format */
+@media (max-width: 500px) {
+  .panel-body {
+    overflow-x: hidden;
+    padding: 6px 8px 10px;
+  }
+  .feed-card,
+  .snapshot-card {
+    box-sizing: border-box;
+    max-width: 100%;
+    width: 100%;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+  }
+  .feed-card-title {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .feed-card-time {
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+  .feed-card-content,
+  .feed-card-body {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .snapshot-name {
+    font-size: 0.82rem;
+    word-break: break-word;
+  }
+  .snapshot-meta {
+    font-size: 0.68rem;
+  }
+}
+
 /* Narrow screens — canvas-first: history collapses to a slim side strip */
 @media (max-width: 500px) {
   .grid {
@@ -918,9 +957,13 @@ body {
     background: var(--bg);
     border-right: 1px solid var(--card-border);
     box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+    overflow: hidden;
   }
   .panel-feed:not(.panel-collapsed) .panel-body {
     display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .panel-feed:not(.panel-collapsed) .panel-header {
     writing-mode: initial;

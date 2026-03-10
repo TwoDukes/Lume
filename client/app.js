@@ -957,10 +957,19 @@ async function shareCanvas() {
     return;
   }
 
-  const fullUrl = `https://lume.cyanlab.ai/share/${currentSlug}`;
+  const fullUrl = `${location.origin}/share/${currentSlug}`;
   const shareBtn = $('share-btn');
 
   try {
+    // Ensure snapshot exists and is public before copying link
+    const snap = await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(currentSlug)}`).catch(() => null);
+    if (!snap || snap.private !== false) {
+      // Toggle to public if currently private (or unknown)
+      if (!snap || snap.private) {
+        await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(currentSlug)}/privacy`, { method: 'POST' });
+      }
+    }
+
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(fullUrl);
     } else {
@@ -972,12 +981,12 @@ async function shareCanvas() {
 
     if (shareBtn) {
       const origHTML = shareBtn.innerHTML;
-      shareBtn.textContent = 'Link copied!';
-      setTimeout(() => { shareBtn.innerHTML = origHTML; }, 2000);
+      shareBtn.textContent = '✓ Link copied!';
+      setTimeout(() => { shareBtn.innerHTML = origHTML; }, 2500);
     }
   } catch (e) {
-    console.error('Copy failed:', e);
-    showToast('Copy failed', 'error', 2200);
+    console.error('Share failed:', e);
+    showToast('Share failed', 'error', 2200);
   }
 }
 window.shareCanvas = shareCanvas;
