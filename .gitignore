@@ -5,3 +5,4 @@ server/server.log
 *.log
 lab/
 .DS_Store
+!lab/demo.html
