@@ -206,7 +206,7 @@ Ephemeral notification cards. They appear bottom-right, auto-dismiss, and includ
 
 | Code block | Chart | Mermaid diagram |
 |---|---|---|
-| ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/canvas-mermaid.jpg) |
+| ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/mermaid-diagram.jpg) |
 
 ---
 
