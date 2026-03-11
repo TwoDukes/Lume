@@ -300,6 +300,27 @@ Embed interactive JavaScript. Serve your files from the `/lab/` directory.
 
 ---
 
+## Interactive Embeds (`/lab/`)
+
+Drop any HTML/JS file into the `lab/` directory and embed it as an iframe block:
+
+```json
+{ "type": "iframe", "url": "http://localhost:7777/lab/my-tool.html", "height": 500 }
+```
+
+Files in `lab/` are served at `http://localhost:7777/lab/*`. No build step, no configuration — just drop a file and reference it. Your agent can generate and serve arbitrary interactive content: custom charts, data explorers, simulations, tools, games. Anything that runs in a browser.
+
+```bash
+# Agent writes a file, then pushes an iframe block pointing to it
+echo '<canvas id="c"></canvas><script>/* your viz here */</script>' > lab/viz.html
+
+curl -X POST http://localhost:7777/api/canvas/block \
+  -H "Authorization: Bearer <token>" \
+  -d '{"type":"iframe","url":"http://localhost:7777/lab/viz.html","height":400}'
+```
+
+---
+
 ## Progressive Rendering
 
 Append blocks one at a time as your agent works. The canvas updates live.
