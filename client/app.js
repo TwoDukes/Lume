@@ -224,16 +224,15 @@ window.togglePrivacy = togglePrivacy;
 async function loadSnapshot(slug) {
   try {
     const snap = await apiFetch(`/api/canvas/snapshots/${encodeURIComponent(slug)}`);
-    if (!snap || !snap.canvas) return;
-    await apiFetch('/api/canvas', {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json', 'X-Canvas-Slug': slug},
-      body: JSON.stringify(snap.canvas),
-    });
+    if (!snap || !snap.canvas) {
+      console.warn('Snapshot has no canvas data:', slug);
+      return;
+    }
     canvasData = snap.canvas;
     renderCanvas();
     currentSlug = slug;
     updateSlugUI(slug);
+    renderSnapshots(await apiFetch('/api/canvas/snapshots'));
   } catch (e) {
     console.error('Failed to load snapshot:', e);
   }
