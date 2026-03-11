@@ -204,9 +204,9 @@ Ephemeral notification cards. They appear bottom-right, auto-dismiss, and includ
 
 `type` can be `success`, `warning`, or `alert` (affects left border color). `ttl` is in seconds (default 8).
 
-| Block types | Chart example |
-|---|---|
-| ![Block types](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) |
+| Code block | Chart | Mermaid diagram |
+|---|---|---|
+| ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/canvas-mermaid.jpg) |
 
 ---
 
