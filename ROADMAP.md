@@ -5,9 +5,7 @@
 - [ ] CORS: restrict to specific origins instead of `*`
 - [ ] Input validation on API endpoints
 - [ ] Mobile layout optimization
-- [ ] Loading states on action buttons
 - [ ] Default welcome/onboarding canvas when empty
-- [ ] Plugin system for custom action handlers
 - [ ] Multi-user support (different dashboards per user)
 - [ ] PWA wrapper for mobile
 

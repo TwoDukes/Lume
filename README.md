@@ -45,7 +45,7 @@ LUME_TOKEN=your-secret-token-here
 # Dashboard login password (auto-generated and logged on first run if not set)
 LUME_PASSWORD=your-dashboard-password
 
-# Optional: OpenClaw gateway for action button handlers
+# Optional: OpenClaw gateway integration
 OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
 OPENCLAW_GATEWAY_TOKEN=your-gateway-token
 ```
