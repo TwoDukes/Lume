@@ -312,7 +312,7 @@ Files in `lab/` are served at `http://localhost:7777/lab/*`. No build step, no c
 
 A working example is included at `lab/demo.html` — an animated node graph that runs live in the canvas:
 
-![Interactive embed demo](screenshots/iframe-demo.jpg)
+![Interactive embed demo](screenshots/iframe-demo.gif)
 
 ```bash
 # Agent writes a file, then pushes an iframe block pointing to it
