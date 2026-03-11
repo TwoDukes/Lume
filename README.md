@@ -17,7 +17,7 @@ Lume is a lightweight Node.js server + vanilla JS frontend that exposes a REST A
 
 The key idea: **the AI writes to the dashboard, not the user.** Your agent decides what appears, streams it in block by block, and updates it as things change.
 
-![Lume canvas](screenshots/canvas-main.jpg)
+![Lume canvas](screenshots/history-open.jpg)
 
 ---
 
@@ -89,8 +89,6 @@ curl -X POST http://localhost:7777/api/toast \
 |---|---|
 | ![History closed](screenshots/history-closed.jpg) | ![History open](screenshots/history-open.jpg) |
 
-![How it works](screenshots/sequence-diagram.jpg)
-
 ---
 
 ## Architecture
@@ -111,6 +109,8 @@ curl -X POST http://localhost:7777/api/toast \
 ```
 
 Lume is **model-agnostic**. Any agent that can make HTTP requests can drive it.
+
+![Sequence diagram](screenshots/sequence-diagram.jpg)
 
 ---
 
@@ -292,9 +292,9 @@ Embed interactive JavaScript. Serve your files from the `/lab/` directory.
 
 ---
 
-![Block types](screenshots/canvas-blocks.jpg)
+![Block types](screenshots/canvas-main.jpg)
 
-| Code block | Chart | Mermaid diagram |
+| Code block | Chart | Mermaid |
 |---|---|---|
 | ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/mermaid-diagram.jpg) |
 
