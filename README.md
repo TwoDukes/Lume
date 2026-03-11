@@ -89,6 +89,8 @@ curl -X POST http://localhost:7777/api/toast \
 |---|---|
 | ![History closed](screenshots/history-closed.jpg) | ![History open](screenshots/history-open.jpg) |
 
+![How it works](screenshots/sequence-diagram.jpg)
+
 ---
 
 ## Architecture
@@ -204,10 +206,6 @@ Ephemeral notification cards. They appear bottom-right, auto-dismiss, and includ
 
 `type` can be `success`, `warning`, or `alert` (affects left border color). `ttl` is in seconds (default 8).
 
-| Code block | Chart | Mermaid diagram |
-|---|---|---|
-| ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/mermaid-diagram.jpg) |
-
 ---
 
 ## Canvas Block Types
@@ -291,6 +289,14 @@ Embed interactive JavaScript. Serve your files from the `/lab/` directory.
 ```json
 { "type": "divider" }
 ```
+
+---
+
+![Block types](screenshots/canvas-blocks.jpg)
+
+| Code block | Chart | Mermaid diagram |
+|---|---|---|
+| ![Code block](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) | ![Mermaid](screenshots/mermaid-diagram.jpg) |
 
 ---
 
