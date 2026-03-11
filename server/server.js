@@ -8,11 +8,12 @@ import cookie from "cookie";
 import crypto from "crypto";
 
 // ─── Config (from environment) ────────────────────────────────────────────────
-const PORT        = parseInt(process.env.PORT || "7777");
-const TOKEN       = process.env.LUME_TOKEN;
-const GW_URL      = process.env.OPENCLAW_GATEWAY_URL || "http://127.0.0.1:18789";
-const GW_TOKEN    = process.env.OPENCLAW_GATEWAY_TOKEN;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+const PORT           = parseInt(process.env.PORT || "7777");
+const TOKEN          = process.env.LUME_TOKEN;
+const GW_URL         = process.env.OPENCLAW_GATEWAY_URL || "http://127.0.0.1:18789";
+const GW_TOKEN       = process.env.OPENCLAW_GATEWAY_TOKEN;
+const CORS_ORIGIN    = process.env.CORS_ORIGIN || "*";
+const SECURE_COOKIES = process.env.SECURE_COOKIES === "true";
 
 if (!TOKEN) {
   console.error("ERROR: LUME_TOKEN is required");
@@ -256,7 +257,7 @@ const server = createServer(async (req, res) => {
     const cookieHeader = cookie.serialize(SESSION_COOKIE, packed, {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: SECURE_COOKIES,
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -271,7 +272,7 @@ const server = createServer(async (req, res) => {
     const clearCookie = cookie.serialize(SESSION_COOKIE, "", {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: SECURE_COOKIES,
       path: "/",
       maxAge: 0,
     });

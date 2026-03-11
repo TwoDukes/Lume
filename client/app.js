@@ -364,14 +364,7 @@ function clearToastCards() {
 
 window.dismissToastCard = dismissToastCard;
 
-function showActionResult(data) {
-  // Legacy support stub — actions panel removed
-  if (!data || !data.id) return;
-  if (data.result && data.result.length > 50) {
-    canvasData = { text: data.result };
-    renderCanvas();
-  }
-}
+
 
 // --- Canvas ---
 let activeCharts = [];
@@ -832,15 +825,13 @@ function renderMarkdown(md) {
 // --- API helper ---
 async function apiFetch(path, opts = {}) {
   const cfg = window.CYAN_CONFIG || {};
-  const storedToken = localStorage.getItem('lume_token');
-  const authToken = cfg.token || storedToken;
+  const authToken = cfg.token;
 
   opts.headers = opts.headers || {};
   if (authToken) opts.headers['Authorization'] = `Bearer ${authToken}`;
 
   const res = await fetch(path, opts);
   if (res.status === 401) {
-    localStorage.removeItem('lume_token');
     window.location.replace('/auth/login');
     throw new Error('Unauthorized');
   }
