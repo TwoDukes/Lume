@@ -17,6 +17,8 @@ Lume is a lightweight Node.js server + vanilla JS frontend that exposes a REST A
 
 The key idea: **the AI writes to the dashboard, not the user.** Your agent decides what appears, streams it in block by block, and updates it as things change.
 
+![Lume canvas](screenshots/canvas-main.jpg)
+
 ---
 
 ## Quick Start
@@ -80,6 +82,12 @@ curl -X POST http://localhost:7777/api/toast \
   -H "Content-Type: application/json" \
   -d '{"id":"hello","icon":"🔵","title":"Hello","body":"Lume is live."}'
 ```
+
+---
+
+| History closed | History open |
+|---|---|
+| ![History closed](screenshots/history-closed.jpg) | ![History open](screenshots/history-open.jpg) |
 
 ---
 
@@ -195,6 +203,12 @@ Ephemeral notification cards. They appear bottom-right, auto-dismiss, and includ
 ```
 
 `type` can be `success`, `warning`, or `alert` (affects left border color). `ttl` is in seconds (default 8).
+
+| Block types | Chart example |
+|---|---|
+| ![Block types](screenshots/canvas-blocks.jpg) | ![Chart](screenshots/canvas-chart.jpg) |
+
+---
 
 ## Canvas Block Types
 
