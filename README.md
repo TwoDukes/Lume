@@ -381,6 +381,26 @@ Markdown blocks render HTML, which means you can embed styled buttons:
 
 ---
 
+## Trust Model
+
+Lume is designed for **trusted-input environments** — your own AI agent pushing content to your own dashboard.
+
+The canvas renderer supports raw HTML in markdown blocks and iframe embeds by design. This means Lume does not sanitize content from your agent, because your agent is the trusted party. Do not expose Lume to untrusted input sources without adding your own sanitization layer.
+
+**Safe to use as-is:**
+- Local development (`localhost`)
+- Internal team deployments behind a private network or VPN
+- Single-operator setups where you control the agent
+
+**Requires additional hardening before:**
+- Accepting canvas input from untrusted third parties
+- Public internet exposure with unknown agents writing to the canvas
+- Multi-tenant deployments
+
+For HTTPS deployments, set `SECURE_COOKIES=true` and configure `CORS_ORIGIN` in your `.env`.
+
+---
+
 ## Auth
 
 The dashboard is protected by a password login page. The `LUME_TOKEN` (used by your AI agent) is separate from the browser login and never exposed in the frontend. Sessions are HMAC-signed cookies — they survive server restarts without re-login.
