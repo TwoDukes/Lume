@@ -594,6 +594,6 @@ server.on("upgrade", (req, socket, head) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log("\n  🔵 Lume");
   console.log(`  http://localhost:${PORT}`);
-  console.log(`  Gateway: ${GW_URL}`);
+  if (GW_TOKEN) console.log(`  Gateway: ${GW_URL}`);
   console.log();
 });

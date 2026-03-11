@@ -22,10 +22,12 @@ if (typeof mermaid !== 'undefined') {
 
 // --- Clock ---
 function updateClock() {
-  $('clock').textContent = new Date().toLocaleTimeString('en-US', {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', hour12: true,
-    timeZone: 'America/Los_Angeles'
-  }) + ' PT';
+  });
+  const tz = now.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+  $('clock').textContent = timeStr + ' ' + tz;
 }
 updateClock();
 setInterval(updateClock, 1000);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lume Login</title>
-  <link rel="icon" type="image/svg+xml" href="https://cyanlab.ai/favicon.svg">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔵</text></svg>">
   <style>
     :root {
       --bg: #050607;
@@ -126,7 +126,7 @@
       try {
         const token = localStorage.getItem('lume_token') || '';
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch('/api/feed', { headers });
+        const res = await fetch('/api/canvas', { headers });
         return res.ok;
       } catch {
         return false;

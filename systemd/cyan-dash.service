@@ -1,12 +1,13 @@
 [Unit]
-Description=Cyan Dashboard
+Description=Lume Dashboard
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/workspace/projects/cyan-dash/server
-EnvironmentFile=%h/workspace/projects/cyan-dash/.env
-ExecStart=/usr/bin/node server.js
+# Update these paths to match your installation
+WorkingDirectory=%h/Lume
+EnvironmentFile=%h/Lume/.env
+ExecStart=/usr/bin/node server/server.js
 Restart=on-failure
 RestartSec=5
 

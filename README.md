@@ -4,7 +4,7 @@
 
 Most dashboards show you data. Lume is different — your AI agent drives it. It decides what to show, when to show it, and how to present it. You watch.
 
-Three panels. One WebSocket. Your AI at the controls.
+Two panels. One WebSocket. Your AI at the controls.
 
 ---
 
@@ -13,7 +13,6 @@ Three panels. One WebSocket. Your AI at the controls.
 Lume is a lightweight Node.js server + vanilla JS frontend that exposes a REST API and WebSocket for an AI agent to push content in real time:
 
 - **History** — a canvas snapshot browser. Load previous canvases, share them, pin or delete. Your working history, always accessible.
-- **Actions** — buttons the user can press to trigger AI tasks
 - **Canvas** — a rich, composable surface: markdown, charts, code, math, diagrams, images, interactive iframes
 
 The key idea: **the AI writes to the dashboard, not the user.** Your agent decides what appears, streams it in block by block, and updates it as things change.
@@ -109,9 +108,8 @@ curl -X POST http://localhost:7777/api/toast \
                                   ┌─────────────────────┐     ┌─────────────────────────┐
                                   │  Browser / Phone     │     │   Public Share Page      │
                                   │  (password login)    │     │   /share/:slug           │
-                                  │  History│Actions│    │     │   (no auth, read-only)   │
-                                  │       Canvas         │     └─────────────────────────┘
-                                  └─────────────────────┘
+                                  │  History │  Canvas    │     │   (no auth, read-only)   │
+                                  └─────────────────────┘     └─────────────────────────┘
 ```
 
 Lume is **model-agnostic**. Any agent that can make HTTP requests can drive it.
@@ -209,24 +207,6 @@ Ephemeral notification cards. They appear bottom-right, auto-dismiss, and includ
 ```
 
 `type` can be `success`, `warning`, or `alert` (affects left border color). `ttl` is in seconds (default 8).
-
-### Actions
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/actions` | Get current action buttons |
-| `PUT` | `/api/actions` | Replace all action buttons |
-| `POST` | `/api/action/:id` | Trigger an action |
-
-**Button schema:**
-```json
-[
-  { "id": "weather", "label": "🌤️ Weather", "color": "#00BCD4" },
-  { "id": "news",    "label": "📰 Top News" }
-]
-```
-
----
 
 ## Canvas Block Types
 
@@ -335,7 +315,7 @@ This makes long-running AI tasks feel alive instead of frozen.
 
 ```bash
 cp systemd/cyan-dash.service ~/.config/systemd/user/lume.service
-# Edit the service file to match your paths
+# Edit the service file paths to match your installation
 systemctl --user daemon-reload
 systemctl --user enable --now lume
 ```
@@ -400,4 +380,4 @@ MIT
 
 ---
 
-*Built by [Dustin Podell](https://github.com/TwoDukes) with Cyan 🔵*
+*Built by [Dustin Podell](https://github.com/TwoDukes) 🔵*
