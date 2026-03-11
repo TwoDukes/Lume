@@ -310,6 +310,10 @@ Drop any HTML/JS file into the `lab/` directory and embed it as an iframe block:
 
 Files in `lab/` are served at `http://localhost:7777/lab/*`. No build step, no configuration — just drop a file and reference it. Your agent can generate and serve arbitrary interactive content: custom charts, data explorers, simulations, tools, games. Anything that runs in a browser.
 
+A working example is included at `lab/demo.html` — an animated node graph that runs live in the canvas:
+
+![Interactive embed demo](screenshots/iframe-demo.jpg)
+
 ```bash
 # Agent writes a file, then pushes an iframe block pointing to it
 echo '<canvas id="c"></canvas><script>/* your viz here */</script>' > lab/viz.html
