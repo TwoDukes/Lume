@@ -19,18 +19,6 @@ The key idea: **the AI writes to the dashboard, not the user.** Your agent decid
 
 ---
 
-## Demo
-
-The JWST educational piece — built live by an AI agent, including generated images and an audio intro:
-
-> Canvas: title → audio player (iframe) → telescope image → facts table → timeline (Mermaid) → deep field image
->
-> All pushed block by block via `POST /api/canvas/block` in real time.
-
-This is the pattern. An agent with context, a canvas to write on, and no constraints on what it puts there.
-
----
-
 ## Quick Start
 
 ### 1. Clone and install
