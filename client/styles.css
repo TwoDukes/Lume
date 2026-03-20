@@ -753,10 +753,10 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-dimmer);
+  color: var(--text-dim);
   font-size: 0.75em;
   gap: 6px;
-  opacity: 0.6;
+  opacity: 0.9;
 }
 .empty-state-icon {
   font-size: 1.8em;

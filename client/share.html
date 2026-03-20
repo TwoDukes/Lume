@@ -43,13 +43,13 @@
 <script>
   window.LUME_SHARE_DATA = __LUME_SHARE_DATA__;
 </script>
-<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
 let mermaidCounter = 0;
 let activeCharts = [];
@@ -238,10 +238,16 @@ function renderShare() {
   initCanvasBlocks(container);
 }
 
-renderShare();
 window.copyCode = copyCode;
 window.expandChart = expandChart;
 window.expandMermaid = expandMermaid;
+// Run after deferred scripts have loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderShare);
+} else {
+  // DOMContentLoaded already fired — wait a tick for deferred scripts
+  window.addEventListener('load', renderShare);
+}
 </script>
 </body>
 </html>
