@@ -1,23 +1,26 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html { height: 100%; width: 100%; overflow: hidden; }
 :root {
-  --bg: #000000;
-  --card: #111111;
-  --card-border: #1e1e1e;
+  --bg: #0a0e14;
+  --card: #111720;
+  --card-border: rgba(255,255,255,.08);
   --cyan: #00BCD4;
   --cyan-dim: #00838F;
   --cyan-glow: #00BCD415;
   --cyan-bright: #00E5FF;
-  --text: #E0E0E0;
-  --text-dim: #888;
-  --text-dimmer: #444;
-  --green: #4CAF50;
-  --red: #f44336;
-  --orange: #FF9800;
+  --text: #e8edf3;
+  --text-dim: #8b97a5;
+  --text-dimmer: #4a5568;
+  --green: #4ade80;
+  --red: #f87171;
+  --orange: #e8a04e;
+  --line: rgba(255,255,255,.08);
+  --surface: #111720;
+  --surface2: #161d28;
 }
 
 body {
-  font-family: -apple-system, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  font-family: Inter, -apple-system, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   height: 100%;
@@ -61,15 +64,22 @@ body {
   gap: 10px;
 }
 .labs-link {
-  font-size: 0.7em;
-  font-weight: 500;
-  letter-spacing: 1px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.6em;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   text-decoration: none;
+  text-transform: uppercase;
   color: var(--text-dimmer);
-  transition: color .2s;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  transition: color .2s, border-color .2s, box-shadow .2s;
 }
 .labs-link:hover {
-  color: var(--cyan-dim);
+  color: var(--cyan);
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 12px var(--cyan-glow);
 }
 
 /* Status badge */

@@ -14,9 +14,9 @@ let snapshotPollTimer = null;
 // --- Init libs ---
 if (typeof mermaid !== 'undefined') {
   mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: {
-    primaryColor: '#00BCD4', primaryTextColor: '#e0e0e0', primaryBorderColor: '#1e1e1e',
+    primaryColor: '#00BCD4', primaryTextColor: '#e8edf3', primaryBorderColor: 'rgba(255,255,255,0.08)',
     lineColor: '#444', secondaryColor: '#111', tertiaryColor: '#111',
-    background: '#000', mainBkg: '#111', nodeBorder: '#1e1e1e'
+    background: '#0a0e14', mainBkg: '#111720', nodeBorder: 'rgba(255,255,255,0.08)'
   }});
 }
 
@@ -540,7 +540,7 @@ function initCanvasBlocks(container) {
           for (const axis of ['x', 'y']) {
             config.options.scales[axis] = config.options.scales[axis] || {};
             config.options.scales[axis].ticks = { color: '#555' };
-            config.options.scales[axis].grid = { color: '#1e1e1e' };
+            config.options.scales[axis].grid = { color: 'rgba(255,255,255,0.08)' };
           }
         }
         const chart = new Chart(el, config);
@@ -636,7 +636,7 @@ function expandChart(chartId) {
       for (const axis of ['x', 'y']) {
         config.options.scales[axis] = config.options.scales[axis] || {};
         config.options.scales[axis].ticks = { color: '#555' };
-        config.options.scales[axis].grid = { color: '#1e1e1e' };
+        config.options.scales[axis].grid = { color: 'rgba(255,255,255,0.08)' };
       }
     }
     new Chart(fullCanvas, config);
