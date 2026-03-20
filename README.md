@@ -300,6 +300,66 @@ Embed interactive JavaScript. Serve your files from the `/lab/` directory.
 
 ---
 
+## Labs
+
+Lume includes a built-in lab management system for organizing your interactive experiments.
+
+### Lab Index
+
+Navigate to `/lab/` in your browser to see a card-based dashboard of all your labs. The lab index requires authentication.
+
+Each lab has:
+- **Name, description, and emoji** — identify your experiments at a glance
+- **Shared / Private** — shared labs are publicly accessible without auth; private labs require login
+- **Starred** — pin important labs to a highlighted section at the top
+- **Archive** — move labs out of the main view without deleting them
+- **Delete Forever** — permanently remove a lab from the index and delete the file from disk
+
+### Getting Started
+
+Copy the example labs file:
+
+```bash
+cp lab/labs.json.example lab/labs.json
+```
+
+Then manage your labs from the `/lab/` dashboard in the browser, or edit `labs.json` directly.
+
+### Labs API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/labs` | Get all labs metadata |
+| `PUT` | `/api/labs` | Update labs metadata (full array replacement) |
+| `DELETE` | `/api/labs/file/:filename` | Permanently delete a lab file from disk |
+
+### labs.json Schema
+
+```json
+[
+  {
+    "id": "unique-id",
+    "file": "filename.html",
+    "name": "Display Name",
+    "description": "What this lab does.",
+    "emoji": "🧪",
+    "shared": false,
+    "starred": false,
+    "archived": false
+  }
+]
+```
+
+### Access Control
+
+- **Shared labs** → publicly accessible at `/lab/filename.html` (no auth)
+- **Private / archived labs** → require authentication
+- **Lab index** (`/lab/`) → always requires authentication
+
+When you toggle a lab's visibility in the dashboard, access control updates immediately.
+
+---
+
 ## Interactive Embeds (`/lab/`)
 
 Drop any HTML/JS file into the `lab/` directory and embed it as an iframe block:

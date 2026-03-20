@@ -1,0 +1,12 @@
+[
+  {
+    "id": "demo",
+    "file": "demo.html",
+    "name": "Interactive Demo",
+    "description": "An animated node graph that runs live in the canvas. A starting point for building your own lab experiments.",
+    "emoji": "🧪",
+    "shared": false,
+    "starred": false,
+    "archived": false
+  }
+]

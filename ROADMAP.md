@@ -25,3 +25,4 @@
 - [x] Rate limiting on API endpoints
 - [x] Toast notification system
 - [x] Full block type support: markdown, code, chart, table, math, mermaid, collapsible, iframe, image
+- [x] Labs management system: card-based index, starred/archive/delete lifecycle, shared/private access control, REST API
