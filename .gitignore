@@ -4,5 +4,7 @@ server/state/
 server/server.log
 *.log
 lab/
-.DS_Store
+!lab/index.html
 !lab/demo.html
+!lab/labs.json.example
+.DS_Store

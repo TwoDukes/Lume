@@ -158,12 +158,37 @@ function isAuthed(req) {
   return false;
 }
 
+// ─── Lab metadata (for public route gating) ──────────────────────────────────
+let _labsCache = null;
+function getLabsMeta() {
+  if (_labsCache) return _labsCache;
+  try {
+    const labsPath = join(LAB_DIR, "labs.json");
+    if (existsSync(labsPath)) {
+      _labsCache = JSON.parse(readFileSync(labsPath, "utf8"));
+      return _labsCache;
+    }
+  } catch {}
+  return [];
+}
+function invalidateLabsCache() { _labsCache = null; }
+
 function isPublicRoute(req, path) {
   if (req.method === "GET" && path === "/auth/login") return true;
   if (req.method === "POST" && path === "/auth/login") return true;
   if (req.method === "GET" && path.startsWith("/share/")) return true;
   // Static assets needed by share page (no sensitive content)
   if (req.method === "GET" && /\.(css|js|ico|png|woff2?|ttf|svg)$/.test(path)) return true;
+
+  // Shared lab files are public (archived labs are not)
+  if (req.method === "GET" && path.startsWith("/lab/")) {
+    const file = path.slice(5);
+    if (!file || file === "index.html") return false; // lab index requires auth
+    const labs = getLabsMeta();
+    const lab = labs.find(l => l.file === file);
+    if (lab && lab.shared && !lab.archived) return true;
+  }
+
   return false;
 }
 
@@ -496,6 +521,50 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // ── Labs metadata API ──
+    if (path === "/api/labs" && req.method === "GET") {
+      try {
+        const labsPath = join(LAB_DIR, "labs.json");
+        if (existsSync(labsPath)) {
+          const data = readFileSync(labsPath, "utf8");
+          return json(res, 200, JSON.parse(data));
+        }
+        return json(res, 200, []);
+      } catch (err) {
+        return json(res, 500, { error: "Could not read labs", detail: err.message });
+      }
+    }
+
+    if (path === "/api/labs" && req.method === "PUT") {
+      try {
+        if (!Array.isArray(bodyJson)) return json(res, 400, { error: "Expected an array of labs" });
+        const labsPath = join(LAB_DIR, "labs.json");
+        writeFileSync(labsPath, JSON.stringify(bodyJson, null, 2));
+        invalidateLabsCache();
+        return json(res, 200, { ok: true });
+      } catch (err) {
+        return json(res, 400, { error: "Invalid labs data", detail: err.message });
+      }
+    }
+
+    // Delete a lab file from disk (permanent)
+    if (path.startsWith("/api/labs/file/") && req.method === "DELETE") {
+      try {
+        const file = decodeURIComponent(path.slice("/api/labs/file/".length));
+        if (file.includes("/") || file.includes("..") || !file.endsWith(".html") || file === "index.html") {
+          return json(res, 400, { error: "Invalid file" });
+        }
+        const filePath = join(LAB_DIR, file);
+        if (existsSync(filePath)) {
+          unlinkSync(filePath);
+          return json(res, 200, { ok: true, deleted: file });
+        }
+        return json(res, 404, { error: "File not found" });
+      } catch (err) {
+        return json(res, 500, { error: "Delete failed", detail: err.message });
+      }
+    }
+
     return json(res, 404, { error: "Not found" });
   }
 
@@ -567,7 +636,9 @@ const server = createServer(async (req, res) => {
 
   // ── Static files (/lab/* and client files) ──
   let filePath;
-  if (path.startsWith("/lab/")) {
+  if (path === "/lab" || path === "/lab/") {
+    filePath = join(LAB_DIR, "index.html");
+  } else if (path.startsWith("/lab/")) {
     filePath = join(LAB_DIR, path.slice(5));
   } else {
     filePath = join(CLIENT_DIR, path === "/" ? "index.html" : path.split("?")[0]);
